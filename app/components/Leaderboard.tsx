@@ -43,25 +43,25 @@ export default function Leaderboard() {
   const [allData, setAllData] = useState<Record<string, LeaderboardEntry[]>>({});
   const [exercises, setExercises] = useState<Array<{ id: number; name: string; type: string }>>([]);
   const [loading, setLoading] = useState(true);
-
-  const wings = [
-    'OCS LEVEL',
-    'ALPHA WING',
-    'CHARLIE WING',
-    'DELTA WING',
-    'ECHO WING',
-    'TANGO WING',
-    'SIERRA WING',
-    'MIDS WING',
-    'AIR WING',
-    'DIS WING',
-    'OCS HQ',
-    'CLD',
-  ];
+  const [wings, setWings] = useState<string[]>([]);
 
   useEffect(() => {
     fetchExercises();
+    fetchWings();
   }, []);
+
+  const fetchWings = async () => {
+    try {
+      const response = await fetch('/api/wings');
+      if (response.ok) {
+        const data = await response.json();
+        // Add OCS LEVEL at the beginning for the filter
+        setWings(['OCS LEVEL', ...data]);
+      }
+    } catch (error) {
+      console.error('Error fetching wings:', error);
+    }
+  };
 
   useEffect(() => {
     fetchData();

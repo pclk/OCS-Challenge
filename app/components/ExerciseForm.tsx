@@ -24,37 +24,37 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
   const [value, setValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const ranks = [
-    'REC', 'PTE', 'LCP', 'CPL', '3SG', '2SG', '1SG', 'SSG', 'MSG',
-    '3WO', '2WO', '1WO', 'MWO', 'SWO',
-    '2LT', 'LTA', 'CPT', 'MAJ', 'LTC', 'COL', 'BG', 'MG', 'LG',
-    'ME4T', 'ME4A', 'ME1', 'ME2', 'ME3', 'ME4', 'ME5', 'ME6', 'ME7', 'ME8', 'ME9',
-  ];
-
-  const wings = [
-    'ALPHA WING',
-    'CHARLIE WING',
-    'DELTA WING',
-    'ECHO WING',
-    'TANGO WING',
-    'SIERRA WING',
-    'MIDS WING',
-    'AIR WING',
-    'DIS WING',
-    'OCS HQ',
-    'CLD',
-  ];
-
-  const userNames = [
-    'SIEW WEI HENG',
-    'ISAAC QUEK JOE HONG',
-    'BRYAN LIM JUN HUANG',
-  ];
+  
+  const [ranks, setRanks] = useState<string[]>([]);
+  const [wings, setWings] = useState<string[]>([]);
+  const [userNames, setUserNames] = useState<string[]>([]);
 
   useEffect(() => {
     fetchExercises();
+    fetchRanks();
   }, []);
+
+  useEffect(() => {
+    // Fetch names when rank changes
+    if (rank) {
+      fetchNames(rank);
+    } else {
+      setUserNames([]);
+      setName(''); // Clear name when rank is cleared
+      setWings([]); // Clear wings when rank is cleared
+      setWing(''); // Clear selected wing
+    }
+  }, [rank]);
+
+  useEffect(() => {
+    // Fetch wings when rank and name are selected
+    if (rank && name) {
+      fetchWings(rank, name);
+    } else {
+      setWings([]);
+      setWing(''); // Clear wing when rank or name is cleared
+    }
+  }, [rank, name]);
 
   const fetchExercises = async () => {
     try {
@@ -68,6 +68,86 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
       }
     } catch (error) {
       console.error('Error fetching exercises:', error);
+    }
+  };
+
+  const fetchRanks = async () => {
+    try {
+      const response = await fetch('/api/ranks');
+      if (response.ok) {
+        const data = await response.json();
+        setRanks(data);
+      }
+    } catch (error) {
+      console.error('Error fetching ranks:', error);
+    }
+  };
+
+  const fetchWings = async (selectedRank?: string, selectedName?: string) => {
+    try {
+      let url = '/api/wings';
+      if (selectedRank && selectedName) {
+        url += `?rank=${encodeURIComponent(selectedRank)}&name=${encodeURIComponent(selectedName)}`;
+      }
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setWings(data);
+        
+        // Auto-fill wing if there's only one option
+        if (data.length === 1) {
+          setWing(data[0]);
+          // Defocus wing field if it was auto-filled
+          setTimeout(() => {
+            const wingInput = document.getElementById('wing') as HTMLInputElement;
+            if (wingInput && document.activeElement === wingInput) {
+              wingInput.blur();
+            }
+          }, 150);
+        } else {
+          // Clear wing if current wing is not in the new list
+          if (wing && !data.includes(wing)) {
+            setWing('');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching wings:', error);
+      setWings([]);
+    }
+  };
+
+  const fetchNames = async (selectedRank: string) => {
+    try {
+      const response = await fetch(`/api/names?rank=${encodeURIComponent(selectedRank)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUserNames(data);
+        
+        // Auto-fill name if there's only one option
+        if (data.length === 1) {
+          // Auto-fill name - this will trigger the useEffect to fetch wings
+          setName(data[0]);
+          // Defocus name field if it was auto-filled
+          setTimeout(() => {
+            const nameInput = document.getElementById('name') as HTMLInputElement;
+            if (nameInput && document.activeElement === nameInput) {
+              nameInput.blur();
+            }
+          }, 150);
+        } else {
+          // Clear name if current name is not in the new list
+          if (name && !data.includes(name)) {
+            setName('');
+            // Clear wings when name is cleared
+            setWings([]);
+            setWing('');
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching names:', error);
+      setUserNames([]);
     }
   };
 
@@ -111,6 +191,7 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
         setName('');
         setWing('');
         setValue('');
+        setUserNames([]);
         if (exercises.length > 0) {
           setSelectedExercise(exercises[0].id);
         }
@@ -165,8 +246,11 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
             placeholder="Search or select rank"
             required
             onEnterPress={() => {
-              const nameInput = document.getElementById('name') as HTMLInputElement;
-              if (nameInput) nameInput.focus();
+              // Always move focus to name field first
+              setTimeout(() => {
+                const nameInput = document.getElementById('name') as HTMLInputElement;
+                if (nameInput) nameInput.focus();
+              }, 50);
             }}
           />
         </div>
@@ -181,8 +265,11 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
             label="Name"
             required
             onEnterPress={() => {
-              const wingInput = document.getElementById('wing') as HTMLInputElement;
-              if (wingInput) wingInput.focus();
+              // Always move focus to wing field first
+              setTimeout(() => {
+                const wingInput = document.getElementById('wing') as HTMLInputElement;
+                if (wingInput) wingInput.focus();
+              }, 50);
             }}
           />
         </div>
@@ -197,6 +284,7 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
             label="Wing"
             required
             onEnterPress={() => {
+              // Always move to value field after wing selection
               const valueInput = document.getElementById('value') as HTMLInputElement;
               if (valueInput) valueInput.focus();
             }}

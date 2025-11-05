@@ -27,6 +27,7 @@ export default function SearchableDropdown({
   const [showDropdown, setShowDropdown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isSelectingRef = useRef(false);
 
   // Filter options based on input - prioritize exact matches and prefix matches
   const getFilteredOptions = () => {
@@ -79,16 +80,27 @@ export default function SearchableDropdown({
 
   // Handle option selection
   const handleSelect = (option: string, moveFocus: boolean = false) => {
-    onChange(option);
+    isSelectingRef.current = true;
+    // Set input value first to ensure it's visible
     setInputValue(option);
+    // Then update the parent component
+    onChange(option);
+    // Close dropdown
     setShowDropdown(false);
-    inputRef.current?.blur();
     
+    // Move focus if requested (only when Enter is pressed manually)
     if (moveFocus && onEnterPress) {
-      // Small delay to ensure value is set, then move focus
       setTimeout(() => {
+        inputRef.current?.blur();
+        isSelectingRef.current = false;
         onEnterPress();
-      }, 0);
+      }, 50);
+    } else {
+      // Small delay before blurring to ensure input value is set
+      setTimeout(() => {
+        inputRef.current?.blur();
+        isSelectingRef.current = false;
+      }, 50);
     }
   };
 
@@ -98,6 +110,7 @@ export default function SearchableDropdown({
       e.preventDefault();
       const relevantOption = getMostRelevantOption();
       if (relevantOption) {
+        // Use handleSelect with moveFocus=true to move to next field
         handleSelect(relevantOption, true);
       } else {
         // No valid match found - clear the input and value
@@ -108,10 +121,28 @@ export default function SearchableDropdown({
     }
   };
 
-  // Sync input value with prop value
+  // Sync input value with prop value (but don't override if user is typing or selecting)
   useEffect(() => {
-    setInputValue(value || '');
-  }, [value]);
+    // Don't sync if we're in the middle of selecting an option
+    if (isSelectingRef.current) {
+      return;
+    }
+    
+    // Only sync if the value prop changed externally (not from our own onChange)
+    // Don't override if user is currently typing (inputValue has content that doesn't match value)
+    const isUserTyping = inputValue.trim().length > 0 && value !== inputValue && 
+                         !inputValue.toLowerCase().includes(value.toLowerCase());
+    
+    if (!isUserTyping && value !== inputValue) {
+      // Sync when value prop is set externally (e.g., form reset)
+      if (value) {
+        setInputValue(value);
+      } else if (!inputValue.trim()) {
+        // Only clear if input is also empty
+        setInputValue('');
+      }
+    }
+  }, [value]); // Only depend on value, not inputValue to avoid loops
 
   // Close dropdown when clicking outside
   useEffect(() => {
