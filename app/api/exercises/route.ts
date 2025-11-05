@@ -3,8 +3,8 @@ import { getExercises } from '@/lib/db';
 
 export async function GET() {
   try {
-    const exercises = getExercises();
-    return NextResponse.json(exercises);
+    const exercises = await getExercises();
+    return NextResponse.json(exercises.map(e => ({ id: e.id, name: e.name, type: e.type })));
   } catch (error) {
     console.error('Error fetching exercises:', error);
     return NextResponse.json(

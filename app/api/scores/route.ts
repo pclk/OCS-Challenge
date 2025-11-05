@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify exercise exists
-    const exercise = getExerciseById(exerciseId);
+    const exercise = await getExerciseById(exerciseId);
     if (!exercise) {
       return NextResponse.json(
         { error: 'Exercise not found' },
@@ -31,14 +31,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Get or create user
-    const userId = getOrCreateUser(rank, name, wing);
+    const userId = await getOrCreateUser(rank, name, wing);
 
     // Create score
-    const result = createScore(userId, exerciseId, value);
+    await createScore(userId, exerciseId, value);
 
     return NextResponse.json({
       success: true,
-      scoreId: result.lastInsertRowid,
     });
   } catch (error) {
     console.error('Error creating score:', error);
@@ -71,7 +70,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const leaderboard = getLeaderboard(exerciseIdNum, limit, wing);
+    const leaderboard = await getLeaderboard(exerciseIdNum, limit, wing);
     return NextResponse.json(leaderboard);
   } catch (error) {
     console.error('Error fetching leaderboard:', error);

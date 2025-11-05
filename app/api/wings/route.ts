@@ -9,12 +9,12 @@ export async function GET(request: NextRequest) {
     
     // If rank and name are provided, filter wings by them
     if (rank && name) {
-      const wings = getWingsByRankAndName(rank, name);
+      const wings = await getWingsByRankAndName(rank, name);
       return NextResponse.json(wings.map(w => w.wing));
     }
     
     // Otherwise return all wings
-    const wings = getWings();
+    const wings = await getWings();
     return NextResponse.json(wings.map(w => w.value));
   } catch (error) {
     console.error('Error fetching wings:', error);

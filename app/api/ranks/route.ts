@@ -3,7 +3,7 @@ import { getRanks } from '@/lib/db';
 
 export async function GET() {
   try {
-    const ranks = getRanks();
+    const ranks = await getRanks();
     return NextResponse.json(ranks.map(r => r.value));
   } catch (error) {
     console.error('Error fetching ranks:', error);

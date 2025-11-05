@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const wing = searchParams.get('wing') || null;
 
-    const leaderboard = getExerciseBasedLeaderboard(wing);
+    const leaderboard = await getExerciseBasedLeaderboard(wing);
     return NextResponse.json(leaderboard);
   } catch (error) {
     console.error('Error fetching exercise-based leaderboard:', error);

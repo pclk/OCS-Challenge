@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const rank = searchParams.get('rank');
     
-    const names = getNamesByRank(rank);
+    const names = await getNamesByRank(rank);
     return NextResponse.json(names.map(n => n.name));
   } catch (error) {
     console.error('Error fetching names:', error);
