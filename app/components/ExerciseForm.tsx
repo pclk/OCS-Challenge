@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, FormEvent, useRef } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import SearchableDropdown from './SearchableDropdown';
 
 interface Exercise {
   id: number;
@@ -17,107 +18,42 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
   const router = useRouter();
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [selectedExercise, setSelectedExercise] = useState<number | ''>('');
-  const [userName, setUserName] = useState('');
-  const [userNameInput, setUserNameInput] = useState('');
-  const [showNameDropdown, setShowNameDropdown] = useState(false);
+  const [rank, setRank] = useState('');
+  const [name, setName] = useState('');
+  const [wing, setWing] = useState('');
   const [value, setValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const nameDropdownRef = useRef<HTMLDivElement>(null);
+
+  const ranks = [
+    'REC', 'PTE', 'LCP', 'CPL', '3SG', '2SG', '1SG', 'SSG', 'MSG',
+    '3WO', '2WO', '1WO', 'MWO', 'SWO',
+    '2LT', 'LTA', 'CPT', 'MAJ', 'LTC', 'COL', 'BG', 'MG', 'LG',
+    'ME4T', 'ME4A', 'ME1', 'ME2', 'ME3', 'ME4', 'ME5', 'ME6', 'ME7', 'ME8', 'ME9',
+  ];
+
+  const wings = [
+    'ALPHA WING',
+    'CHARLIE WING',
+    'DELTA WING',
+    'ECHO WING',
+    'TANGO WING',
+    'SIERRA WING',
+    'MIDS WING',
+    'AIR WING',
+    'DIS WING',
+    'OCS HQ',
+    'CLD',
+  ];
 
   const userNames = [
-    'ME4T SIEW WEI HENG',
-    'ME4T ISAAC QUEK JOE HONG',
-    'ME4T BRYAN LIM JUN HUANG',
+    'SIEW WEI HENG',
+    'ISAAC QUEK JOE HONG',
+    'BRYAN LIM JUN HUANG',
   ];
 
   useEffect(() => {
     fetchExercises();
-  }, []);
-
-  // Filter names based on input
-  const filteredNames = userNames.filter((name) =>
-    name.toLowerCase().includes(userNameInput.toLowerCase())
-  );
-
-  // Find most relevant name (exact match first, then partial match)
-  const getMostRelevantName = (): string => {
-    if (!userNameInput.trim()) return '';
-    
-    const lowerInput = userNameInput.toLowerCase().trim();
-    
-    // Check for exact match
-    const exactMatch = userNames.find((name) => name.toLowerCase() === lowerInput);
-    if (exactMatch) return exactMatch;
-    
-    // Check for names that start with input
-    const startsWith = filteredNames.find((name) => 
-      name.toLowerCase().startsWith(lowerInput)
-    );
-    if (startsWith) return startsWith;
-    
-    // Return first filtered match
-    if (filteredNames.length > 0) return filteredNames[0];
-    
-    return '';
-  };
-
-  // Handle input change and auto-select
-  const handleNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value;
-    setUserNameInput(input);
-    setShowNameDropdown(true);
-    
-    // Auto-select most relevant name
-    const relevantName = getMostRelevantName();
-    if (relevantName) {
-      setUserName(relevantName);
-    } else {
-      setUserName('');
-    }
-  };
-
-  // Handle name selection from dropdown
-  const handleNameSelect = (name: string) => {
-    setUserName(name);
-    setUserNameInput(name);
-    setShowNameDropdown(false);
-  };
-
-  // Handle Enter key press
-  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const relevantName = getMostRelevantName();
-      if (relevantName) {
-        handleNameSelect(relevantName);
-        // Move focus to next input after selection
-        const valueInput = document.getElementById('value') as HTMLInputElement;
-        if (valueInput) {
-          valueInput.focus();
-        }
-      }
-    }
-  };
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        nameInputRef.current &&
-        nameDropdownRef.current &&
-        !nameInputRef.current.contains(event.target as Node) &&
-        !nameDropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowNameDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
   }, []);
 
   const fetchExercises = async () => {
@@ -139,7 +75,7 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
     e.preventDefault();
     setMessage(null);
 
-    if (!selectedExercise || !userName || !value.trim()) {
+    if (!selectedExercise || !rank || !name || !wing || !value.trim()) {
       setMessage({ type: 'error', text: 'Please fill in all fields' });
       return;
     }
@@ -159,7 +95,9 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userName: userName.trim(),
+          rank: rank.trim(),
+          name: name.trim(),
+          wing: wing.trim(),
           exerciseId: selectedExercise,
           value: numValue,
         }),
@@ -169,8 +107,9 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
 
       if (response.ok) {
         setMessage({ type: 'success', text: 'Score submitted successfully!' });
-        setUserName('');
-        setUserNameInput('');
+        setRank('');
+        setName('');
+        setWing('');
         setValue('');
         if (exercises.length > 0) {
           setSelectedExercise(exercises[0].id);
@@ -214,50 +153,54 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
           </select>
         </div>
 
-        <div className="relative">
-          <label htmlFor="userName" className="block text-sm font-medium text-white mb-1">
-            Your Name
+        <div>
+          <label htmlFor="rank" className="block text-sm font-medium text-white mb-1">
+            Rank
           </label>
-          <input
-            ref={nameInputRef}
-            id="userName"
-            type="text"
-            value={userNameInput}
-            onChange={handleNameInputChange}
-            onKeyDown={handleNameKeyDown}
-            onFocus={() => setShowNameDropdown(true)}
-            className="w-full px-3 py-2 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white"
-            placeholder="Search or type your name"
+          <SearchableDropdown
+            id="rank"
+            options={ranks}
+            value={rank}
+            onChange={setRank}
+            placeholder="Search or select rank"
             required
-            autoComplete="off"
+            onEnterPress={() => {
+              const nameInput = document.getElementById('name') as HTMLInputElement;
+              if (nameInput) nameInput.focus();
+            }}
           />
-          {showNameDropdown && filteredNames.length > 0 && (
-            <div
-              ref={nameDropdownRef}
-              className="absolute z-10 w-full mt-1 bg-black border border-white/20 rounded-md shadow-lg max-h-60 overflow-auto"
-            >
-              {filteredNames.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => handleNameSelect(name)}
-                  className={`w-full text-left px-3 py-2 hover:bg-[#ff7301]/20 ${
-                    userName === name ? 'bg-[#ff7301]/30 text-[#ff7301]' : 'text-white'
-                  }`}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          )}
-          {showNameDropdown && userNameInput && filteredNames.length === 0 && (
-            <div
-              ref={nameDropdownRef}
-              className="absolute z-10 w-full mt-1 bg-black border border-white/20 rounded-md shadow-lg p-3"
-            >
-              <p className="text-white/70 text-sm">No matching names found</p>
-            </div>
-          )}
+        </div>
+
+        <div>
+          <SearchableDropdown
+            id="name"
+            options={userNames}
+            value={name}
+            onChange={setName}
+            placeholder="Search or type your name"
+            label="Name"
+            required
+            onEnterPress={() => {
+              const wingInput = document.getElementById('wing') as HTMLInputElement;
+              if (wingInput) wingInput.focus();
+            }}
+          />
+        </div>
+
+        <div>
+          <SearchableDropdown
+            id="wing"
+            options={wings}
+            value={wing}
+            onChange={setWing}
+            placeholder="Search or select wing"
+            label="Wing"
+            required
+            onEnterPress={() => {
+              const valueInput = document.getElementById('value') as HTMLInputElement;
+              if (valueInput) valueInput.focus();
+            }}
+          />
         </div>
 
         <div>
