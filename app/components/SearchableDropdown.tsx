@@ -99,6 +99,11 @@ export default function SearchableDropdown({
       const relevantOption = getMostRelevantOption();
       if (relevantOption) {
         handleSelect(relevantOption, true);
+      } else {
+        // No valid match found - clear the input and value
+        setInputValue('');
+        onChange('');
+        setShowDropdown(false);
       }
     }
   };
