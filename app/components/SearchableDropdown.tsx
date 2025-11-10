@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react';
 
 interface SearchableDropdownProps {
   options: string[];
@@ -11,6 +11,7 @@ interface SearchableDropdownProps {
   required?: boolean;
   id?: string;
   onEnterPress?: () => void; // Callback when Enter is pressed and option is selected
+  loading?: boolean; // Whether options are still loading
 }
 
 export default function SearchableDropdown({
@@ -22,6 +23,7 @@ export default function SearchableDropdown({
   required = false,
   id,
   onEnterPress,
+  loading = false,
 }: SearchableDropdownProps) {
   const [inputValue, setInputValue] = useState(value || '');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -79,7 +81,7 @@ export default function SearchableDropdown({
   };
 
   // Handle option selection
-  const handleSelect = (option: string, moveFocus: boolean = false) => {
+  const handleSelect = useCallback((option: string) => {
     isSelectingRef.current = true;
     // Set input value first to ensure it's visible
     setInputValue(option);
@@ -88,8 +90,8 @@ export default function SearchableDropdown({
     // Close dropdown
     setShowDropdown(false);
     
-    // Move focus if requested (only when Enter is pressed manually)
-    if (moveFocus && onEnterPress) {
+    // Always move focus if value exists and callback provided
+    if (option && onEnterPress) {
       setTimeout(() => {
         inputRef.current?.blur();
         isSelectingRef.current = false;
@@ -102,22 +104,26 @@ export default function SearchableDropdown({
         isSelectingRef.current = false;
       }, 50);
     }
-  };
+  }, [onChange, onEnterPress]);
+
+  // Shared logic for confirming selection (Enter key or click outside)
+  const handleConfirmSelection = useCallback(() => {
+    const relevantOption = getMostRelevantOption();
+    if (relevantOption) {
+      handleSelect(relevantOption); // Will now always move focus if value exists
+    } else {
+      // No valid match - clear but don't move focus
+      setInputValue('');
+      onChange('');
+      setShowDropdown(false);
+    }
+  }, [inputValue, filteredOptions, handleSelect, onChange]);
 
   // Handle Enter key press
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const relevantOption = getMostRelevantOption();
-      if (relevantOption) {
-        // Use handleSelect with moveFocus=true to move to next field
-        handleSelect(relevantOption, true);
-      } else {
-        // No valid match found - clear the input and value
-        setInputValue('');
-        onChange('');
-        setShowDropdown(false);
-      }
+      handleConfirmSelection();
     }
   };
 
@@ -134,26 +140,29 @@ export default function SearchableDropdown({
                          !inputValue.toLowerCase().includes(value.toLowerCase());
     
     if (!isUserTyping && value !== inputValue) {
-      // Sync when value prop is set externally (e.g., form reset)
+      // Sync when value prop is set externally (e.g., form reset or auto-fill)
       if (value) {
         setInputValue(value);
       } else if (!inputValue.trim()) {
         // Only clear if input is also empty
         setInputValue('');
       }
+      // Ensure dropdown closes when value is set externally (auto-fill scenario)
+      setShowDropdown(false);
     }
   }, [value]); // Only depend on value, not inputValue to avoid loops
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside (with same behavior as Enter key)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
         inputRef.current &&
         dropdownRef.current &&
         !inputRef.current.contains(event.target as Node) &&
-        !dropdownRef.current.contains(event.target as Node)
+        !dropdownRef.current.contains(event.target as Node) &&
+        showDropdown // Only process if dropdown is open
       ) {
-        setShowDropdown(false);
+        handleConfirmSelection(); // Same behavior as Enter key
       }
     };
 
@@ -161,7 +170,7 @@ export default function SearchableDropdown({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [showDropdown, handleConfirmSelection]);
 
   return (
     <div className="relative">
@@ -170,20 +179,77 @@ export default function SearchableDropdown({
           {label}
         </label>
       )}
-      <input
-        ref={inputRef}
-        id={id}
-        type="text"
-        value={inputValue}
-        onChange={handleInputChange}
-        onKeyDown={handleKeyDown}
-        onFocus={() => setShowDropdown(true)}
-        className="w-full px-3 py-2 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white"
-        placeholder={placeholder}
-        required={required}
-        autoComplete="off"
-      />
-      {showDropdown && filteredOptions.length > 0 && (
+      <div className="relative">
+        <input
+          ref={inputRef}
+          id={id}
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setShowDropdown(true)}
+          className="w-full px-3 py-2 pr-10 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white"
+          placeholder={placeholder}
+          required={required}
+          autoComplete="off"
+          disabled={loading}
+        />
+        {loading && (
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <svg
+              className="animate-spin h-5 w-5 text-[#ff7301]"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </div>
+        )}
+      </div>
+      {loading && showDropdown && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-10 w-full mt-1 bg-black border border-white/20 rounded-md shadow-lg p-3"
+        >
+          <div className="flex items-center justify-center space-x-2">
+            <svg
+              className="animate-spin h-5 w-5 text-[#ff7301]"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            <p className="text-white/70 text-sm">Loading options...</p>
+          </div>
+        </div>
+      )}
+      {!loading && showDropdown && filteredOptions.length > 0 && (
         <div
           ref={dropdownRef}
           className="absolute z-10 w-full mt-1 bg-black border border-white/20 rounded-md shadow-lg max-h-60 overflow-auto"
@@ -210,7 +276,7 @@ export default function SearchableDropdown({
           })}
         </div>
       )}
-      {showDropdown && inputValue && filteredOptions.length === 0 && (
+      {!loading && showDropdown && inputValue && filteredOptions.length === 0 && (
         <div
           ref={dropdownRef}
           className="absolute z-10 w-full mt-1 bg-black border border-white/20 rounded-md shadow-lg p-3"

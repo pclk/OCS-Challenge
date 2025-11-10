@@ -30,6 +30,9 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
   const [ranks, setRanks] = useState<string[]>([]);
   const [wings, setWings] = useState<string[]>([]);
   const [userNames, setUserNames] = useState<string[]>([]);
+  const [loadingRanks, setLoadingRanks] = useState(false);
+  const [loadingNames, setLoadingNames] = useState(false);
+  const [loadingWings, setLoadingWings] = useState(false);
 
   useEffect(() => {
     fetchRanks();
@@ -51,6 +54,8 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
       setName(''); // Clear name when rank is cleared
       setWings([]); // Clear wings when rank is cleared
       setWing(''); // Clear selected wing
+      setLoadingNames(false); // Reset loading state
+      setLoadingWings(false); // Reset loading state
     }
   }, [rank]);
 
@@ -61,10 +66,12 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
     } else {
       setWings([]);
       setWing(''); // Clear wing when rank or name is cleared
+      setLoadingWings(false); // Reset loading state
     }
   }, [rank, name]);
 
   const fetchRanks = async () => {
+    setLoadingRanks(true);
     try {
       const response = await fetch('/api/ranks');
       if (response.ok) {
@@ -77,10 +84,13 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
     } catch (error) {
       console.error('Error fetching ranks:', error);
       toast.error('Network error: Unable to fetch ranks. Please check your connection.');
+    } finally {
+      setLoadingRanks(false);
     }
   };
 
   const fetchWings = async (selectedRank?: string, selectedName?: string) => {
+    setLoadingWings(true);
     try {
       let url = '/api/wings';
       if (selectedRank && selectedName) {
@@ -116,10 +126,13 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
       console.error('Error fetching wings:', error);
       toast.error('Network error: Unable to fetch wings. Please check your connection.');
       setWings([]);
+    } finally {
+      setLoadingWings(false);
     }
   };
 
   const fetchNames = async (selectedRank: string) => {
+    setLoadingNames(true);
     try {
       const response = await fetch(`/api/names?rank=${encodeURIComponent(selectedRank)}`);
       if (response.ok) {
@@ -155,6 +168,8 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
       console.error('Error fetching names:', error);
       toast.error('Network error: Unable to fetch names. Please check your connection.');
       setUserNames([]);
+    } finally {
+      setLoadingNames(false);
     }
   };
 
@@ -286,6 +301,7 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
             onChange={setRank}
             placeholder="Search or select rank"
             required
+            loading={loadingRanks}
             onEnterPress={() => {
               // Always move focus to name field first
               setTimeout(() => {
@@ -296,41 +312,47 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
           />
         </div>
 
-        <div>
-          <SearchableDropdown
-            id="name"
-            options={userNames}
-            value={name}
-            onChange={setName}
-            placeholder="Search or type your name"
-            label="Name"
-            required
-            onEnterPress={() => {
-              // Always move focus to wing field first
-              setTimeout(() => {
-                const wingInput = document.getElementById('wing') as HTMLInputElement;
-                if (wingInput) wingInput.focus();
-              }, 50);
-            }}
-          />
-        </div>
+        {rank && (
+          <div>
+            <SearchableDropdown
+              id="name"
+              options={userNames}
+              value={name}
+              onChange={setName}
+              placeholder="Search or type your name"
+              label="Name"
+              required
+              loading={loadingNames}
+              onEnterPress={() => {
+                // Always move focus to wing field first
+                setTimeout(() => {
+                  const wingInput = document.getElementById('wing') as HTMLInputElement;
+                  if (wingInput) wingInput.focus();
+                }, 50);
+              }}
+            />
+          </div>
+        )}
 
-        <div>
-          <SearchableDropdown
-            id="wing"
-            options={wings}
-            value={wing}
-            onChange={setWing}
-            placeholder="Search or select wing"
-            label="Wing"
-            required
-            onEnterPress={() => {
-              // Always move to value field after wing selection
-              const valueInput = document.getElementById('value') as HTMLInputElement;
-              if (valueInput) valueInput.focus();
-            }}
-          />
-        </div>
+        {rank && name && (
+          <div>
+            <SearchableDropdown
+              id="wing"
+              options={wings}
+              value={wing}
+              onChange={setWing}
+              placeholder="Search or select wing"
+              label="Wing"
+              required
+              loading={loadingWings}
+              onEnterPress={() => {
+                // Always move to value field after wing selection
+                const valueInput = document.getElementById('value') as HTMLInputElement;
+                if (valueInput) valueInput.focus();
+              }}
+            />
+          </div>
+        )}
 
         <div>
           <label htmlFor="value" className="block text-sm font-medium text-white mb-1">

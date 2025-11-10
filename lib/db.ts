@@ -115,46 +115,92 @@ export async function initDatabase() {
   checkDatabaseAvailable();
   const client = await getPool().connect();
   try {
+    // Get existing database schema before creating tables
+    console.log('[DB] initDatabase - Checking existing database schema...');
+    const tablesResult = await client.query(`
+      SELECT 
+        table_name,
+        table_schema
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `);
+    
+    const existingTables = tablesResult.rows.map(row => row.table_name);
+    console.log('[DB] initDatabase - Existing tables:', JSON.stringify({
+      count: existingTables.length,
+      tables: existingTables
+    }, null, 2));
+    
+    // Helper function to check if table exists (using in-memory array)
+    const tableExistsInMemory = (tableName: string): boolean => {
+      return existingTables.includes(tableName);
+    };
+    
     console.log('[DB] initDatabase - Creating tables...');
     // Create ranks table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS ranks (
-        id SERIAL PRIMARY KEY,
-        value TEXT NOT NULL UNIQUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    if (!tableExistsInMemory('ranks')) {
+      await client.query(`
+        CREATE TABLE ranks (
+          id SERIAL PRIMARY KEY,
+          value TEXT NOT NULL UNIQUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      existingTables.push('ranks'); // Update in-memory array
+      console.log('[DB] initDatabase - Created ranks table');
+    } else {
+      console.log('[DB] initDatabase - Ranks table already exists, skipping creation');
+    }
 
     // Create wings table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS wings (
-        id SERIAL PRIMARY KEY,
-        value TEXT NOT NULL UNIQUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    if (!tableExistsInMemory('wings')) {
+      await client.query(`
+        CREATE TABLE wings (
+          id SERIAL PRIMARY KEY,
+          value TEXT NOT NULL UNIQUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      existingTables.push('wings'); // Update in-memory array
+      console.log('[DB] initDatabase - Created wings table');
+    } else {
+      console.log('[DB] initDatabase - Wings table already exists, skipping creation');
+    }
 
     // Create exercises table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS exercises (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL UNIQUE,
-        type TEXT NOT NULL CHECK(type IN ('rep', 'seconds')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    if (!tableExistsInMemory('exercises')) {
+      await client.query(`
+        CREATE TABLE exercises (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE,
+          type TEXT NOT NULL CHECK(type IN ('rep', 'seconds')),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      existingTables.push('exercises'); // Update in-memory array
+      console.log('[DB] initDatabase - Created exercises table');
+    } else {
+      console.log('[DB] initDatabase - Exercises table already exists, skipping creation');
+    }
 
     // Create name_rank_mappings table (includes wing for validation)
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS name_rank_mappings (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        rank TEXT NOT NULL,
-        wing TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(name, rank, wing)
-      )
-    `);
+    if (!tableExistsInMemory('name_rank_mappings')) {
+      await client.query(`
+        CREATE TABLE name_rank_mappings (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          rank TEXT NOT NULL,
+          wing TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(name, rank, wing)
+        )
+      `);
+      existingTables.push('name_rank_mappings'); // Update in-memory array
+      console.log('[DB] initDatabase - Created name_rank_mappings table');
+    } else {
+      console.log('[DB] initDatabase - Name_rank_mappings table already exists, skipping creation');
+    }
 
     // Migrate name_rank_mappings table if it doesn't have wing column
     try {
@@ -168,15 +214,21 @@ export async function initDatabase() {
     }
 
     // Create users table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        rank TEXT,
-        name TEXT NOT NULL,
-        wing TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    if (!tableExistsInMemory('users')) {
+      await client.query(`
+        CREATE TABLE users (
+          id SERIAL PRIMARY KEY,
+          rank TEXT,
+          name TEXT NOT NULL,
+          wing TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      existingTables.push('users'); // Update in-memory array
+      console.log('[DB] initDatabase - Created users table');
+    } else {
+      console.log('[DB] initDatabase - Users table already exists, skipping creation');
+    }
 
     // Migrate existing users table if it doesn't have rank and wing columns
     try {
@@ -200,17 +252,23 @@ export async function initDatabase() {
     }
 
     // Create scores table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS scores (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        exercise_id INTEGER NOT NULL,
-        value INTEGER NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (exercise_id) REFERENCES exercises(id)
-      )
-    `);
+    if (!tableExistsInMemory('scores')) {
+      await client.query(`
+        CREATE TABLE scores (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          exercise_id INTEGER NOT NULL,
+          value INTEGER NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (exercise_id) REFERENCES exercises(id)
+        )
+      `);
+      existingTables.push('scores'); // Update in-memory array
+      console.log('[DB] initDatabase - Created scores table');
+    } else {
+      console.log('[DB] initDatabase - Scores table already exists, skipping creation');
+    }
 
     // Create indexes for better query performance
     await client.query(`
@@ -221,33 +279,33 @@ export async function initDatabase() {
     `);
     console.log('[DB] initDatabase - Tables and indexes created');
 
-    // Load ranks from ranks.csv
-    const ranksPath = path.join(process.cwd(), 'data', 'ranks.csv');
-    const ranks = parseCSV<{ value: string }>(ranksPath);
-    console.log('[DB] initDatabase - Loaded ranks from CSV:');
-
-    // Load wings from wings.csv
-    const wingsPath = path.join(process.cwd(), 'data', 'wings.csv');
-    const wings = parseCSV<{ value: string }>(wingsPath);
-    console.log('[DB] initDatabase - Loaded wings from CSV:');
-
-    // Load personnel from personnel.csv
-    const personnelPath = path.join(process.cwd(), 'data', 'personnel.csv');
-    const personnel = parseCSV<{ rank: string; name: string; wing: string }>(personnelPath);
-    console.log('[DB] initDatabase - Loaded personnel from CSV:');
+    // Check if data already exists before loading CSV files
+    const ranksCount = await client.query('SELECT COUNT(*) as count FROM ranks');
+    const wingsCount = await client.query('SELECT COUNT(*) as count FROM wings');
+    const exercisesCount = await client.query('SELECT COUNT(*) as count FROM exercises');
+    const mappingsCount = await client.query('SELECT COUNT(*) as count FROM name_rank_mappings');
     
-    // Load exercises from exercise.csv
-    const exercisePath = path.join(process.cwd(), 'data', 'exercise.csv');
-    const exercises = parseCSV<{ name: string; type: string }>(exercisePath);
-    console.log('[DB] initDatabase - Loaded exercises from CSV');
+    const existingRanksCount = parseInt(ranksCount.rows[0].count, 10);
+    const existingWingsCount = parseInt(wingsCount.rows[0].count, 10);
+    const existingExercisesCount = parseInt(exercisesCount.rows[0].count, 10);
+    const existingMappingsCount = parseInt(mappingsCount.rows[0].count, 10);
 
-    // Insert ranks
-    const validRanks = ranks.filter(r => r.value);
     let ranksInserted = 0;
-    
-    if (await checkTableDataExists(client, 'ranks', validRanks.length)) {
-      console.log('[DB] initDatabase - Ranks data already exists, skipping insertion');
-    } else {
+    let wingsInserted = 0;
+    let exercisesInserted = 0;
+    let mappingsInserted = 0;
+    let validRanks: Array<{ value: string }> = [];
+    let validWings: Array<{ value: string }> = [];
+    let validExercises: Array<{ name: string; type: string }> = [];
+    let validPersonnel: Array<{ rank: string; name: string; wing: string }> = [];
+
+    // Only load and insert ranks if table is empty or has insufficient data
+    if (existingRanksCount === 0) {
+      const ranksPath = path.join(process.cwd(), 'data', 'ranks.csv');
+      const ranks = parseCSV<{ value: string }>(ranksPath);
+      console.log('[DB] initDatabase - Loaded ranks from CSV');
+      validRanks = ranks.filter(r => r.value);
+      
       ranksInserted = await bulkInsert(
         client,
         'ranks',
@@ -260,15 +318,17 @@ export async function initDatabase() {
         inserted: ranksInserted,
         skipped: validRanks.length - ranksInserted
       }, null, 2));
+    } else {
+      console.log('[DB] initDatabase - Ranks data already exists (count: ' + existingRanksCount + '), skipping CSV load and insertion');
     }
 
-    // Insert wings
-    const validWings = wings.filter(w => w.value);
-    let wingsInserted = 0;
-    
-    if (await checkTableDataExists(client, 'wings', validWings.length)) {
-      console.log('[DB] initDatabase - Wings data already exists, skipping insertion');
-    } else {
+    // Only load and insert wings if table is empty or has insufficient data
+    if (existingWingsCount === 0) {
+      const wingsPath = path.join(process.cwd(), 'data', 'wings.csv');
+      const wings = parseCSV<{ value: string }>(wingsPath);
+      console.log('[DB] initDatabase - Loaded wings from CSV');
+      validWings = wings.filter(w => w.value);
+      
       wingsInserted = await bulkInsert(
         client,
         'wings',
@@ -281,15 +341,17 @@ export async function initDatabase() {
         inserted: wingsInserted,
         skipped: validWings.length - wingsInserted
       }, null, 2));
+    } else {
+      console.log('[DB] initDatabase - Wings data already exists (count: ' + existingWingsCount + '), skipping CSV load and insertion');
     }
 
-    // Insert exercises
-    const validExercises = exercises.filter(e => e.name && e.type);
-    let exercisesInserted = 0;
-    
-    if (await checkTableDataExists(client, 'exercises', validExercises.length)) {
-      console.log('[DB] initDatabase - Exercises data already exists, skipping insertion');
-    } else {
+    // Only load and insert exercises if table is empty or has insufficient data
+    if (existingExercisesCount === 0) {
+      const exercisePath = path.join(process.cwd(), 'data', 'exercise.csv');
+      const exercises = parseCSV<{ name: string; type: string }>(exercisePath);
+      console.log('[DB] initDatabase - Loaded exercises from CSV');
+      validExercises = exercises.filter(e => e.name && e.type);
+      
       exercisesInserted = await bulkInsert(
         client,
         'exercises',
@@ -302,15 +364,17 @@ export async function initDatabase() {
         inserted: exercisesInserted,
         skipped: validExercises.length - exercisesInserted
       }, null, 2));
+    } else {
+      console.log('[DB] initDatabase - Exercises data already exists (count: ' + existingExercisesCount + '), skipping CSV load and insertion');
     }
 
-    // Insert name-rank-wing mappings
-    const validPersonnel = personnel.filter(p => p.name && p.rank && p.wing);
-    let mappingsInserted = 0;
-    
-    if (await checkTableDataExists(client, 'name_rank_mappings', validPersonnel.length)) {
-      console.log('[DB] initDatabase - Name-rank-wing mappings data already exists, skipping insertion');
-    } else {
+    // Only load and insert name-rank-wing mappings if table is empty or has insufficient data
+    if (existingMappingsCount === 0) {
+      const personnelPath = path.join(process.cwd(), 'data', 'personnel.csv');
+      const personnel = parseCSV<{ rank: string; name: string; wing: string }>(personnelPath);
+      console.log('[DB] initDatabase - Loaded personnel from CSV');
+      validPersonnel = personnel.filter(p => p.name && p.rank && p.wing);
+      
       mappingsInserted = await bulkInsert(
         client,
         'name_rank_mappings',
@@ -323,6 +387,8 @@ export async function initDatabase() {
         inserted: mappingsInserted,
         skipped: validPersonnel.length - mappingsInserted
       }, null, 2));
+    } else {
+      console.log('[DB] initDatabase - Name-rank-wing mappings data already exists (count: ' + existingMappingsCount + '), skipping CSV load and insertion');
     }
 
     const duration = Date.now() - startTime;
@@ -330,10 +396,26 @@ export async function initDatabase() {
       function: 'initDatabase',
       duration: `${duration}ms`,
       summary: {
-        ranks: { total: validRanks.length, inserted: ranksInserted },
-        wings: { total: validWings.length, inserted: wingsInserted },
-        exercises: { total: validExercises.length, inserted: exercisesInserted },
-        mappings: { total: validPersonnel.length, inserted: mappingsInserted }
+        ranks: { 
+          existing: existingRanksCount, 
+          loaded: validRanks.length, 
+          inserted: ranksInserted 
+        },
+        wings: { 
+          existing: existingWingsCount, 
+          loaded: validWings.length, 
+          inserted: wingsInserted 
+        },
+        exercises: { 
+          existing: existingExercisesCount, 
+          loaded: validExercises.length, 
+          inserted: exercisesInserted 
+        },
+        mappings: { 
+          existing: existingMappingsCount, 
+          loaded: validPersonnel.length, 
+          inserted: mappingsInserted 
+        }
       }
     }, null, 2));
   } finally {
