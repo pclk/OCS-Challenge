@@ -2,6 +2,7 @@
 
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import SearchableDropdown from './SearchableDropdown';
 
 interface Exercise {
@@ -12,11 +13,11 @@ interface Exercise {
 
 interface ExerciseFormProps {
   onScoreSubmitted?: () => void;
+  exercises: Exercise[];
 }
 
-export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
+export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFormProps) {
   const router = useRouter();
-  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [selectedExercise, setSelectedExercise] = useState<number | ''>('');
   const [rank, setRank] = useState('');
   const [name, setName] = useState('');
@@ -24,15 +25,22 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
   const [value, setValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   
   const [ranks, setRanks] = useState<string[]>([]);
   const [wings, setWings] = useState<string[]>([]);
   const [userNames, setUserNames] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchExercises();
     fetchRanks();
   }, []);
+
+  useEffect(() => {
+    // Set default selected exercise when exercises are loaded
+    if (exercises.length > 0 && !selectedExercise) {
+      setSelectedExercise(exercises[0].id);
+    }
+  }, [exercises, selectedExercise]);
 
   useEffect(() => {
     // Fetch names when rank changes
@@ -56,30 +64,19 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
     }
   }, [rank, name]);
 
-  const fetchExercises = async () => {
-    try {
-      const response = await fetch('/api/exercises');
-      if (response.ok) {
-        const data = await response.json();
-        setExercises(data);
-        if (data.length > 0) {
-          setSelectedExercise(data[0].id);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching exercises:', error);
-    }
-  };
-
   const fetchRanks = async () => {
     try {
       const response = await fetch('/api/ranks');
       if (response.ok) {
         const data = await response.json();
         setRanks(data);
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch ranks' }));
+        toast.error(errorData.error || 'Failed to fetch ranks');
       }
     } catch (error) {
       console.error('Error fetching ranks:', error);
+      toast.error('Network error: Unable to fetch ranks. Please check your connection.');
     }
   };
 
@@ -110,9 +107,14 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
             setWing('');
           }
         }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch wings' }));
+        toast.error(errorData.error || 'Failed to fetch wings');
+        setWings([]);
       }
     } catch (error) {
       console.error('Error fetching wings:', error);
+      toast.error('Network error: Unable to fetch wings. Please check your connection.');
       setWings([]);
     }
   };
@@ -144,9 +146,14 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
             setWing('');
           }
         }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch names' }));
+        toast.error(errorData.error || 'Failed to fetch names');
+        setUserNames([]);
       }
     } catch (error) {
       console.error('Error fetching names:', error);
+      toast.error('Network error: Unable to fetch names. Please check your connection.');
       setUserNames([]);
     }
   };
@@ -156,17 +163,22 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
     setMessage(null);
 
     if (!selectedExercise || !rank || !name || !wing || !value.trim()) {
-      setMessage({ type: 'error', text: 'Please fill in all fields' });
+      const errorMsg = 'Please fill in all fields';
+      setMessage({ type: 'error', text: errorMsg });
+      toast.error(errorMsg);
       return;
     }
 
     const numValue = parseInt(value, 10);
     if (isNaN(numValue) || numValue < 0) {
-      setMessage({ type: 'error', text: 'Please enter a valid number' });
+      const errorMsg = 'Please enter a valid number';
+      setMessage({ type: 'error', text: errorMsg });
+      toast.error(errorMsg);
       return;
     }
 
     setIsSubmitting(true);
+    const loadingToast = toast.loading('Submitting score...');
 
     try {
       const response = await fetch('/api/scores', {
@@ -184,9 +196,12 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
       });
 
       const data = await response.json();
+      toast.dismiss(loadingToast);
 
       if (response.ok) {
-        setMessage({ type: 'success', text: 'Score submitted successfully!' });
+        const successMsg = 'Score submitted successfully!';
+        setMessage({ type: 'success', text: successMsg });
+        toast.success(successMsg);
         setRank('');
         setName('');
         setWing('');
@@ -200,10 +215,16 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
           onScoreSubmitted();
         }
       } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to submit score' });
+        const errorMsg = data.error || 'Failed to submit score';
+        setMessage({ type: 'error', text: errorMsg });
+        toast.error(errorMsg);
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Network error. Please try again.' });
+      toast.dismiss(loadingToast);
+      const errorMsg = 'Network error. Please check your connection and try again.';
+      setMessage({ type: 'error', text: errorMsg });
+      toast.error(errorMsg);
+      console.error('Error submitting score:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -213,9 +234,29 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
   const inputLabel = selectedExerciseData?.type === 'seconds' ? 'Seconds' : 'Reps';
 
   return (
-    <div className="bg-black border border-white/20 rounded-lg shadow-md p-6 mb-6">
-      <h2 className="text-2xl font-bold mb-4 text-white">Submit Your Score</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="bg-black border border-white/20 rounded-lg shadow-md mb-6">
+      <button
+        type="button"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="w-full flex items-center justify-between p-6 text-left hover:bg-white/5 transition-colors"
+      >
+        <h2 className="text-2xl font-bold text-white">Submit Your Score</h2>
+        <svg
+          className={`w-6 h-6 text-white transition-transform duration-300 ${isCollapsed ? '' : 'rotate-180'}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          isCollapsed ? 'max-h-0' : 'max-h-[2000px]'
+        }`}
+      >
+        <div className="px-6 pb-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="exercise" className="block text-sm font-medium text-white mb-1">
             Exercise
@@ -327,6 +368,8 @@ export default function ExerciseForm({ onScoreSubmitted }: ExerciseFormProps) {
           {isSubmitting ? 'Submitting...' : 'Submit Score'}
         </button>
       </form>
+        </div>
+      </div>
     </div>
   );
 }

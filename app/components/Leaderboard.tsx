@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import SearchableDropdown from './SearchableDropdown';
 
 interface LeaderboardEntry {
@@ -36,82 +37,73 @@ function formatDate(dateString: string): string {
   return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
 }
 
-export default function Leaderboard() {
+interface LeaderboardProps {
+  exercises: Array<{ id: number; name: string; type: string }>;
+  wings: string[];
+}
+
+export default function Leaderboard({ exercises, wings: allWings }: LeaderboardProps) {
   const [activeTab, setActiveTab] = useState<'exercise' | 'all'>('exercise');
   const [wing, setWing] = useState('OCS LEVEL');
   const [exerciseBasedData, setExerciseBasedData] = useState<ExerciseBasedEntry[]>([]);
   const [allData, setAllData] = useState<Record<string, LeaderboardEntry[]>>({});
-  const [exercises, setExercises] = useState<Array<{ id: number; name: string; type: string }>>([]);
   const [loading, setLoading] = useState(true);
-  const [wings, setWings] = useState<string[]>([]);
+  // Add OCS LEVEL at the beginning for the filter
+  const wings = ['OCS LEVEL', ...allWings];
 
-  useEffect(() => {
-    fetchExercises();
-    fetchWings();
-  }, []);
-
-  const fetchWings = async () => {
-    try {
-      const response = await fetch('/api/wings');
-      if (response.ok) {
-        const data = await response.json();
-        // Add OCS LEVEL at the beginning for the filter
-        setWings(['OCS LEVEL', ...data]);
-      }
-    } catch (error) {
-      console.error('Error fetching wings:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, [wing, activeTab]);
-
-  const fetchExercises = async () => {
-    try {
-      const response = await fetch('/api/exercises');
-      if (response.ok) {
-        const data = await response.json();
-        setExercises(data);
-      }
-    } catch (error) {
-      console.error('Error fetching exercises:', error);
-    }
-  };
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
+    const loadingToast = toast.loading('Loading leaderboard...');
     try {
       if (activeTab === 'exercise') {
         const response = await fetch(`/api/exercise-leaderboard?wing=${encodeURIComponent(wing)}`);
         if (response.ok) {
           const data = await response.json();
+          console.log('exercise-based leaderboard fetched:', data);
           setExerciseBasedData(data);
+          toast.dismiss(loadingToast);
+        } else {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch leaderboard' }));
+          toast.dismiss(loadingToast);
+          toast.error(errorData.error || 'Failed to fetch leaderboard');
         }
       } else {
-        const response = await fetch('/api/exercises');
-        if (response.ok) {
-          const exData = await response.json();
-          const leaderboards: Record<string, LeaderboardEntry[]> = {};
-          
-          for (const exercise of exData) {
-            const lbResponse = await fetch(
-              `/api/scores?exerciseId=${exercise.id}&limit=10&wing=${encodeURIComponent(wing)}`
-            );
-            if (lbResponse.ok) {
-              const lbData = await lbResponse.json();
-              leaderboards[exercise.name] = lbData;
-            }
-          }
-          setAllData(leaderboards);
+        // Use exercises prop instead of fetching again
+        if (exercises.length === 0) {
+          toast.dismiss(loadingToast);
+          setLoading(false);
+          return;
         }
+        
+        const leaderboards: Record<string, LeaderboardEntry[]> = {};
+        
+        for (const exercise of exercises) {
+          const lbResponse = await fetch(
+            `/api/scores?exerciseId=${exercise.id}&limit=10&wing=${encodeURIComponent(wing)}`
+          );
+          if (lbResponse.ok) {
+            const lbData = await lbResponse.json();
+            leaderboards[exercise.name] = lbData;
+          } else {
+            const errorData = await lbResponse.json().catch(() => ({ error: 'Failed to fetch scores' }));
+            toast.error(`Failed to fetch scores for ${exercise.name}: ${errorData.error || 'Unknown error'}`);
+          }
+        }
+        setAllData(leaderboards);
+        toast.dismiss(loadingToast);
       }
     } catch (error) {
+      toast.dismiss(loadingToast);
       console.error('Error fetching leaderboard data:', error);
+      toast.error('Network error: Unable to fetch leaderboard. Please check your connection.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [wing, activeTab, exercises]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const getDisplayName = (entry: LeaderboardEntry | ExerciseBasedEntry) => {
     const rankPart = entry.rank ? `${entry.rank} ` : '';
