@@ -155,6 +155,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
               <tr className="border-b border-white/20">
                 <th className="text-left py-2 px-4 font-semibold text-white">Exercise</th>
                 <th className="text-left py-2 px-4 font-semibold text-white">Name</th>
+                <th className="text-left py-2 px-4 font-semibold text-white">Wing</th>
                 <th className="text-right py-2 px-4 font-semibold text-white">Reps</th>
                 <th className="text-right py-2 px-4 font-semibold text-white">Date</th>
               </tr>
@@ -162,7 +163,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
             <tbody>
               {exerciseBasedData.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-white/70">
+                  <td colSpan={5} className="py-8 text-center text-white/70">
                     No scores yet. Be the first!
                   </td>
                 </tr>
@@ -177,6 +178,9 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     </td>
                     <td className="py-3 px-4 text-white">
                       {getDisplayName(entry)}
+                    </td>
+                    <td className="py-3 px-4 text-white/80">
+                      {entry.wing || '-'}
                     </td>
                     <td className="py-3 px-4 text-[#ff7301] text-right font-semibold">
                       {entry.value}
@@ -211,6 +215,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                           <tr className="border-b border-white/20">
                             <th className="text-left py-2 px-4 font-semibold text-white">Rank</th>
                             <th className="text-left py-2 px-4 font-semibold text-white">Name</th>
+                            <th className="text-left py-2 px-4 font-semibold text-white">Wing</th>
                             <th className="text-right py-2 px-4 font-semibold text-white">
                               {exercise.type === 'seconds' ? 'Seconds' : 'Reps'}
                             </th>
@@ -228,6 +233,9 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                               </td>
                               <td className="py-3 px-4 text-white">
                                 {getDisplayName(entry)}
+                              </td>
+                              <td className="py-3 px-4 text-white/80">
+                                {entry.wing || '-'}
                               </td>
                               <td className="py-3 px-4 text-[#ff7301] text-right font-semibold">
                                 {entry.value}
