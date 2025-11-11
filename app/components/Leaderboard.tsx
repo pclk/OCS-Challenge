@@ -54,25 +54,32 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   // Add OCS LEVEL at the beginning for the filter
   const wings = ['OCS LEVEL', ...allWings];
 
-  // Deduplicate entries: keep only the latest entry for each unique combination of rank, name, wing, and value
+  // Deduplicate entries: keep only the highest rep count for each unique combination of name and wing
   const deduplicateEntries = useCallback((entries: LeaderboardEntry[]): LeaderboardEntry[] => {
     const entryMap = new Map<string, LeaderboardEntry>();
     
     for (const entry of entries) {
-      // Create a unique key from rank, name, wing, and value
-      const key = `${entry.rank || ''}|${entry.user_name}|${entry.wing || ''}|${entry.value}`;
+      // Create a unique key from name and wing
+      const key = `${entry.user_name}|${entry.wing || ''}`;
       
       const existingEntry = entryMap.get(key);
       if (!existingEntry) {
-        // First entry with this combination
+        // First entry for this person
         entryMap.set(key, entry);
       } else {
-        // Compare dates and keep the one with the latest date
-        const existingDate = new Date(existingEntry.created_at);
-        const currentDate = new Date(entry.created_at);
-        if (currentDate > existingDate) {
+        // Compare values and keep the one with the highest rep count
+        if (entry.value > existingEntry.value) {
+          // Current entry has higher value, keep it
           entryMap.set(key, entry);
+        } else if (entry.value === existingEntry.value) {
+          // Same value, keep the one with the latest date
+          const existingDate = new Date(existingEntry.created_at);
+          const currentDate = new Date(entry.created_at);
+          if (currentDate > existingDate) {
+            entryMap.set(key, entry);
+          }
         }
+        // If existing entry has higher value, keep it (do nothing)
       }
     }
     
