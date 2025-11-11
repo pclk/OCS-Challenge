@@ -91,6 +91,7 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
 
   const fetchWings = async (selectedRank?: string, selectedName?: string) => {
     setLoadingWings(true);
+    let shouldFocus = false;
     try {
       let url = '/api/wings';
       if (selectedRank && selectedName) {
@@ -111,11 +112,13 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
               wingInput.blur();
             }
           }, 150);
+          shouldFocus = false; // Don't focus if auto-filled
         } else {
           // Clear wing if current wing is not in the new list
           if (wing && !data.includes(wing)) {
             setWing('');
           }
+          shouldFocus = true; // Focus if multiple options
         }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Failed to fetch wings' }));
@@ -128,11 +131,21 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
       setWings([]);
     } finally {
       setLoadingWings(false);
+      // Focus wing field after loading completes (if not auto-filled and field exists)
+      if (shouldFocus) {
+        setTimeout(() => {
+          const wingInput = document.getElementById('wing') as HTMLInputElement;
+          if (wingInput) {
+            wingInput.focus();
+          }
+        }, 100);
+      }
     }
   };
 
   const fetchNames = async (selectedRank: string) => {
     setLoadingNames(true);
+    let shouldFocus = false;
     try {
       const response = await fetch(`/api/names?rank=${encodeURIComponent(selectedRank)}`);
       if (response.ok) {
@@ -150,6 +163,7 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
               nameInput.blur();
             }
           }, 150);
+          shouldFocus = false; // Don't focus if auto-filled
         } else {
           // Clear name if current name is not in the new list
           if (name && !data.includes(name)) {
@@ -158,6 +172,7 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
             setWings([]);
             setWing('');
           }
+          shouldFocus = true; // Focus if multiple options
         }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Failed to fetch names' }));
@@ -170,6 +185,15 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
       setUserNames([]);
     } finally {
       setLoadingNames(false);
+      // Focus name field after loading completes (if not auto-filled and field exists)
+      if (shouldFocus) {
+        setTimeout(() => {
+          const nameInput = document.getElementById('name') as HTMLInputElement;
+          if (nameInput) {
+            nameInput.focus();
+          }
+        }, 100);
+      }
     }
   };
 
