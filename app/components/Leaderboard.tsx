@@ -54,6 +54,38 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   // Add OCS LEVEL at the beginning for the filter
   const wings = ['OCS LEVEL', ...allWings];
 
+  // Deduplicate entries: keep only the latest entry for each unique combination of rank, name, wing, and value
+  const deduplicateEntries = useCallback((entries: LeaderboardEntry[]): LeaderboardEntry[] => {
+    const entryMap = new Map<string, LeaderboardEntry>();
+    
+    for (const entry of entries) {
+      // Create a unique key from rank, name, wing, and value
+      const key = `${entry.rank || ''}|${entry.user_name}|${entry.wing || ''}|${entry.value}`;
+      
+      const existingEntry = entryMap.get(key);
+      if (!existingEntry) {
+        // First entry with this combination
+        entryMap.set(key, entry);
+      } else {
+        // Compare dates and keep the one with the latest date
+        const existingDate = new Date(existingEntry.created_at);
+        const currentDate = new Date(entry.created_at);
+        if (currentDate > existingDate) {
+          entryMap.set(key, entry);
+        }
+      }
+    }
+    
+    // Convert back to array and re-sort by value DESC, then created_at DESC
+    const deduplicated = Array.from(entryMap.values());
+    return deduplicated.sort((a, b) => {
+      if (b.value !== a.value) {
+        return b.value - a.value; // Sort by value DESC
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime(); // Then by date DESC
+    });
+  }, []);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     const loadingToast = toast.loading('Loading leaderboard...');
@@ -86,7 +118,9 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
           );
           if (lbResponse.ok) {
             const lbData = await lbResponse.json();
-            leaderboards[exercise.name] = lbData;
+            // Deduplicate entries: keep only latest entry for each unique combination of rank, name, wing, and value
+            const deduplicatedData = deduplicateEntries(lbData);
+            leaderboards[exercise.name] = deduplicatedData;
           } else {
             const errorData = await lbResponse.json().catch(() => ({ error: 'Failed to fetch scores' }));
             toast.error(`Failed to fetch scores for ${exercise.name}: ${errorData.error || 'Unknown error'}`);
@@ -102,7 +136,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     } finally {
       setLoading(false);
     }
-  }, [wing, activeTab, exercises]);
+  }, [wing, activeTab, exercises, deduplicateEntries]);
 
   useEffect(() => {
     fetchData();
