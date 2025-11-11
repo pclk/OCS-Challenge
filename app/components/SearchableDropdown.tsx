@@ -30,6 +30,7 @@ export default function SearchableDropdown({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const isSelectingRef = useRef(false);
+  const previousValueRef = useRef<string>(value || '');
 
   // Filter options based on input - prioritize exact matches and prefix matches
   const getFilteredOptions = () => {
@@ -131,26 +132,39 @@ export default function SearchableDropdown({
   useEffect(() => {
     // Don't sync if we're in the middle of selecting an option
     if (isSelectingRef.current) {
+      previousValueRef.current = value || '';
+      return;
+    }
+    
+    // If value changed from non-empty to empty, it's a form reset - clear inputValue
+    if (!value && previousValueRef.current && inputValue.trim().length > 0) {
+      setInputValue('');
+      setShowDropdown(false);
+      previousValueRef.current = '';
       return;
     }
     
     // Only sync if the value prop changed externally (not from our own onChange)
     // Don't override if user is currently typing (inputValue has content that doesn't match value)
-    const isUserTyping = inputValue.trim().length > 0 && value !== inputValue && 
-                         !inputValue.toLowerCase().includes(value.toLowerCase());
-    
-    if (!isUserTyping && value !== inputValue) {
-      // Sync when value prop is set externally (e.g., form reset or auto-fill)
-      if (value) {
+    if (value && value !== inputValue) {
+      // Check if user is actively typing
+      // User is typing if: inputValue has content, value is empty (cleared by handleInputChange), 
+      // or inputValue doesn't match/contain value
+      const isUserTyping = inputValue.trim().length > 0 && 
+                           !inputValue.toLowerCase().includes(value.toLowerCase()) &&
+                           value.toLowerCase() !== inputValue.toLowerCase();
+      
+      if (!isUserTyping) {
+        // Sync when value prop is set externally (e.g., auto-fill or form reset with new value)
         setInputValue(value);
-      } else if (!inputValue.trim()) {
-        // Only clear if input is also empty
-        setInputValue('');
+        // Ensure dropdown closes when value is set externally (auto-fill scenario)
+        setShowDropdown(false);
       }
-      // Ensure dropdown closes when value is set externally (auto-fill scenario)
-      setShowDropdown(false);
     }
-  }, [value]); // Only depend on value, not inputValue to avoid loops
+    
+    // Update previous value ref
+    previousValueRef.current = value || '';
+  }, [value, inputValue]); // Include inputValue to check typing state
 
   // Close dropdown when clicking outside (with same behavior as Enter key)
   useEffect(() => {

@@ -241,11 +241,18 @@ export default function ExerciseForm({ onScoreSubmitted, exercises }: ExerciseFo
         const successMsg = 'Score submitted successfully!';
         setMessage({ type: 'success', text: successMsg });
         toast.success(successMsg);
+        // Clear all input values
         setRank('');
         setName('');
         setWing('');
         setValue('');
+        // Clear dependent data arrays
         setUserNames([]);
+        setWings([]);
+        // Reset loading states
+        setLoadingNames(false);
+        setLoadingWings(false);
+        // Reset exercise to first one
         if (exercises.length > 0) {
           setSelectedExercise(exercises[0].id);
         }
