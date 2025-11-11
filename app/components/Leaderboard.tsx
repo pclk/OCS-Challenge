@@ -48,6 +48,9 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   const [exerciseBasedData, setExerciseBasedData] = useState<ExerciseBasedEntry[]>([]);
   const [allData, setAllData] = useState<Record<string, LeaderboardEntry[]>>({});
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [exercisePages, setExercisePages] = useState<Record<string, number>>({});
+  const itemsPerPage = 10;
   // Add OCS LEVEL at the beginning for the filter
   const wings = ['OCS LEVEL', ...allWings];
 
@@ -79,7 +82,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
         
         for (const exercise of exercises) {
           const lbResponse = await fetch(
-            `/api/scores?exerciseId=${exercise.id}&limit=10&wing=${encodeURIComponent(wing)}`
+            `/api/scores?exerciseId=${exercise.id}&limit=100&wing=${encodeURIComponent(wing)}`
           );
           if (lbResponse.ok) {
             const lbData = await lbResponse.json();
@@ -103,12 +106,33 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
 
   useEffect(() => {
     fetchData();
+    setCurrentPage(1); // Reset to first page when data changes
+    setExercisePages({}); // Reset exercise pages
   }, [fetchData]);
 
   const getDisplayName = (entry: LeaderboardEntry | ExerciseBasedEntry) => {
     const rankPart = entry.rank ? `${entry.rank} ` : '';
     return `${rankPart}${entry.user_name}`;
   };
+
+  // Pagination helpers for Exercise-Based View
+  const totalPagesExercise = Math.ceil(exerciseBasedData.length / itemsPerPage);
+  const startIndexExercise = (currentPage - 1) * itemsPerPage;
+  const endIndexExercise = startIndexExercise + itemsPerPage;
+  const paginatedExerciseData = exerciseBasedData.slice(startIndexExercise, endIndexExercise);
+
+  // Pagination helpers for All Scores View
+  const getExercisePage = (exerciseName: string) => exercisePages[exerciseName] || 1;
+  const setExercisePage = (exerciseName: string, page: number) => {
+    setExercisePages(prev => ({ ...prev, [exerciseName]: page }));
+  };
+  const getPaginatedEntries = (entries: LeaderboardEntry[], exerciseName: string) => {
+    const page = getExercisePage(exerciseName);
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return entries.slice(startIndex, endIndex);
+  };
+  const getTotalPages = (entries: LeaderboardEntry[]) => Math.ceil(entries.length / itemsPerPage);
 
   return (
     <div className="bg-black border border-white/20 rounded-lg shadow-md p-6">
@@ -149,51 +173,79 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
       {loading ? (
         <p className="text-white/70">Loading...</p>
       ) : activeTab === 'exercise' ? (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-white/20">
-                <th className="text-left py-2 px-4 font-semibold text-white">Exercise</th>
-                <th className="text-left py-2 px-4 font-semibold text-white">Name</th>
-                <th className="text-left py-2 px-4 font-semibold text-white">Wing</th>
-                <th className="text-right py-2 px-4 font-semibold text-white">Reps</th>
-                <th className="text-right py-2 px-4 font-semibold text-white">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {exerciseBasedData.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-8 text-center text-white/70">
-                    No scores yet. Be the first!
-                  </td>
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/20">
+                  <th className="text-left py-2 px-4 font-semibold text-white">Exercise</th>
+                  <th className="text-left py-2 px-4 font-semibold text-white">Name</th>
+                  <th className="text-left py-2 px-4 font-semibold text-white">Wing</th>
+                  <th className="text-right py-2 px-4 font-semibold text-white">Reps</th>
+                  <th className="text-right py-2 px-4 font-semibold text-white">Date</th>
                 </tr>
-              ) : (
-                exerciseBasedData.map((entry) => (
-                  <tr
-                    key={entry.exercise_id}
-                    className="border-b border-white/10 hover:bg-white/5"
-                  >
-                    <td className="py-3 px-4 text-white font-medium">
-                      {entry.exercise_name}
-                    </td>
-                    <td className="py-3 px-4 text-white">
-                      {getDisplayName(entry)}
-                    </td>
-                    <td className="py-3 px-4 text-white/80">
-                      {entry.wing || '-'}
-                    </td>
-                    <td className="py-3 px-4 text-[#ff7301] text-right font-semibold">
-                      {entry.value}
-                    </td>
-                    <td className="py-3 px-4 text-white/70 text-right text-sm">
-                      {formatDate(entry.created_at)}
+              </thead>
+              <tbody>
+                {exerciseBasedData.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-white/70">
+                      No scores yet. Be the first!
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  paginatedExerciseData.map((entry) => (
+                    <tr
+                      key={entry.exercise_id}
+                      className="border-b border-white/10 hover:bg-white/5"
+                    >
+                      <td className="py-3 px-4 text-white font-medium">
+                        {entry.exercise_name}
+                      </td>
+                      <td className="py-3 px-4 text-white">
+                        {getDisplayName(entry)}
+                      </td>
+                      <td className="py-3 px-4 text-white/80">
+                        {entry.wing || '-'}
+                      </td>
+                      <td className="py-3 px-4 text-[#ff7301] text-right font-semibold">
+                        {entry.value}
+                      </td>
+                      <td className="py-3 px-4 text-white/70 text-right text-sm">
+                        {formatDate(entry.created_at)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {totalPagesExercise > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/20">
+              <div className="text-white/70 text-sm">
+                Showing {startIndexExercise + 1} to {Math.min(endIndexExercise, exerciseBasedData.length)} of {exerciseBasedData.length} entries
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-white/70 text-sm">
+                  Page {currentPage} of {totalPagesExercise}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPagesExercise, prev + 1))}
+                  disabled={currentPage === totalPagesExercise}
+                  className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <div className="space-y-6">
           {exercises.length === 0 ? (
@@ -201,6 +253,12 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
           ) : (
             exercises.map((exercise) => {
               const entries = allData[exercise.name] || [];
+              const paginatedEntries = getPaginatedEntries(entries, exercise.name);
+              const totalPages = getTotalPages(entries);
+              const currentExercisePage = getExercisePage(exercise.name);
+              const startIndex = (currentExercisePage - 1) * itemsPerPage;
+              const endIndex = startIndex + itemsPerPage;
+              
               return (
                 <div key={exercise.id} className="bg-black border border-white/20 rounded-lg p-4">
                   <h2 className="text-xl font-bold mb-4 text-white">
@@ -209,45 +267,73 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                   {entries.length === 0 ? (
                     <p className="text-white/70">No scores yet. Be the first!</p>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-white/20">
-                            <th className="text-left py-2 px-4 font-semibold text-white">Rank</th>
-                            <th className="text-left py-2 px-4 font-semibold text-white">Name</th>
-                            <th className="text-left py-2 px-4 font-semibold text-white">Wing</th>
-                            <th className="text-right py-2 px-4 font-semibold text-white">
-                              {exercise.type === 'seconds' ? 'Seconds' : 'Reps'}
-                            </th>
-                            <th className="text-right py-2 px-4 font-semibold text-white">Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {entries.map((entry, index) => (
-                            <tr
-                              key={entry.id}
-                              className="border-b border-white/10 hover:bg-white/5"
-                            >
-                              <td className="py-3 px-4 text-white font-medium">
-                                #{index + 1}
-                              </td>
-                              <td className="py-3 px-4 text-white">
-                                {getDisplayName(entry)}
-                              </td>
-                              <td className="py-3 px-4 text-white/80">
-                                {entry.wing || '-'}
-                              </td>
-                              <td className="py-3 px-4 text-[#ff7301] text-right font-semibold">
-                                {entry.value}
-                              </td>
-                              <td className="py-3 px-4 text-white/70 text-right text-sm">
-                                {formatDate(entry.created_at)}
-                              </td>
+                    <>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-white/20">
+                              <th className="text-left py-2 px-4 font-semibold text-white">Rank</th>
+                              <th className="text-left py-2 px-4 font-semibold text-white">Name</th>
+                              <th className="text-left py-2 px-4 font-semibold text-white">Wing</th>
+                              <th className="text-right py-2 px-4 font-semibold text-white">
+                                {exercise.type === 'seconds' ? 'Seconds' : 'Reps'}
+                              </th>
+                              <th className="text-right py-2 px-4 font-semibold text-white">Date</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            {paginatedEntries.map((entry, index) => (
+                              <tr
+                                key={entry.id}
+                                className="border-b border-white/10 hover:bg-white/5"
+                              >
+                                <td className="py-3 px-4 text-white font-medium">
+                                  #{startIndex + index + 1}
+                                </td>
+                                <td className="py-3 px-4 text-white">
+                                  {getDisplayName(entry)}
+                                </td>
+                                <td className="py-3 px-4 text-white/80">
+                                  {entry.wing || '-'}
+                                </td>
+                                <td className="py-3 px-4 text-[#ff7301] text-right font-semibold">
+                                  {entry.value}
+                                </td>
+                                <td className="py-3 px-4 text-white/70 text-right text-sm">
+                                  {formatDate(entry.created_at)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/20">
+                          <div className="text-white/70 text-sm">
+                            Showing {startIndex + 1} to {Math.min(endIndex, entries.length)} of {entries.length} entries
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setExercisePage(exercise.name, Math.max(1, currentExercisePage - 1))}
+                              disabled={currentExercisePage === 1}
+                              className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
+                            >
+                              Previous
+                            </button>
+                            <span className="text-white/70 text-sm">
+                              Page {currentExercisePage} of {totalPages}
+                            </span>
+                            <button
+                              onClick={() => setExercisePage(exercise.name, Math.min(totalPages, currentExercisePage + 1))}
+                              disabled={currentExercisePage === totalPages}
+                              className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
+                            >
+                              Next
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               );
