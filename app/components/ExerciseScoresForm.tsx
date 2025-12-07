@@ -137,7 +137,7 @@ export default function ExerciseScoresForm({
         </div>
 
         <p className="text-white/70 mb-6 text-sm">
-          Enter your scores below. Leave exercises blank if you didn't complete them.
+          Enter your scores below. Leave exercises blank if you didn&apos;t complete them.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
