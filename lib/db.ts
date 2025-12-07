@@ -184,7 +184,7 @@ async function warmRoutes() {
     // Warm /names route
     try {
       await fetch(`${baseUrl}/api/names`);
-    } catch (error) {
+      } catch (error) {
       // Silently fail - warming is non-critical
     }
   } catch (error) {
@@ -225,7 +225,7 @@ async function ensureInitialized() {
 export async function getOrCreateUser(name: string, wing: string): Promise<number> {
   console.log('[DB] getOrCreateUser - Called with:', { name, wing });
   try {
-    await ensureInitialized();
+  await ensureInitialized();
     
     console.log('[DB] getOrCreateUser - Searching for existing user with raw SQL:', { name, wing });
     // Use raw SQL to avoid Prisma adapter issues
@@ -281,11 +281,11 @@ export async function getWings() {
     orderBy: { value: 'asc' },
   });
   console.log('[DB] getWings - Retrieved wings:', JSON.stringify({
-    function: 'getWings',
-    parameters: {},
+      function: 'getWings',
+      parameters: {},
     result: { count: wings.length },
     data: wings.slice(0, 3)
-  }, null, 2));
+    }, null, 2));
   return wings;
 }
 
@@ -313,7 +313,7 @@ export async function getWingsByName(name?: string | null) {
     parameters: { name },
     result: { count: wings.length },
     data: wings.slice(0, 3)
-  }, null, 2));
+    }, null, 2));
   return wings;
 }
 
@@ -347,7 +347,7 @@ export async function getUserInfoByName(name: string) {
     return null;
   }
   try {
-    await ensureInitialized();
+  await ensureInitialized();
     console.log('[DB] getUserInfoByName - Database initialized, executing raw SQL query');
     
     // Use raw SQL query to avoid Prisma adapter issues with the model name containing "rank"
@@ -393,11 +393,11 @@ export async function getExercises() {
     orderBy: { name: 'asc' },
   });
   console.log('[DB] getExercises - Retrieved exercises:', JSON.stringify({
-    function: 'getExercises',
-    parameters: {},
+      function: 'getExercises',
+      parameters: {},
     result: { count: exercises.length },
     data: exercises.slice(0, 3)
-  }, null, 2));
+    }, null, 2));
   return exercises;
 }
 
@@ -408,11 +408,11 @@ export async function getExerciseById(id: number) {
     where: { id },
   });
   console.log('[DB] getExerciseById - Retrieved exercise:', JSON.stringify({
-    function: 'getExerciseById',
-    parameters: { id },
+      function: 'getExerciseById',
+      parameters: { id },
     result: { found: !!exercise },
     data: exercise ? [exercise] : null
-  }, null, 2));
+    }, null, 2));
   return exercise;
 }
 
@@ -484,8 +484,8 @@ export async function getLeaderboard(exerciseId: number, limit: number = 10, win
   const where: any = {
     exerciseId,
   };
-  
-  if (wing && wing !== 'OCS LEVEL') {
+    
+    if (wing && wing !== 'OCS LEVEL') {
     where.user = {
       wing,
     };
@@ -519,12 +519,12 @@ export async function getLeaderboard(exerciseId: number, limit: number = 10, win
   }));
   
   console.log('[DB] getLeaderboard - Retrieved leaderboard:', JSON.stringify({
-    function: 'getLeaderboard',
-    parameters: { exerciseId, limit, wing: wing || null },
-    result: { count: rows.length },
-    data: rows.slice(0, 3)
-  }, null, 2));
-  return rows;
+      function: 'getLeaderboard',
+      parameters: { exerciseId, limit, wing: wing || null },
+      result: { count: rows.length },
+      data: rows.slice(0, 3)
+    }, null, 2));
+    return rows;
 }
 
 // Get exercise-based leaderboard (highest rep per exercise, optionally filtered by wing)
@@ -542,12 +542,12 @@ export async function getExerciseBasedLeaderboard(wing?: string | null) {
     user_id: number;
   }> = [];
 
-  for (const exercise of exercises) {
+    for (const exercise of exercises) {
     const where: any = {
       exerciseId: exercise.id,
     };
-    
-    if (wing && wing !== 'OCS LEVEL') {
+      
+      if (wing && wing !== 'OCS LEVEL') {
       where.user = {
         wing,
       };
@@ -571,10 +571,10 @@ export async function getExerciseBasedLeaderboard(wing?: string | null) {
     });
 
     if (topScore) {
-      results.push({
-        exercise_id: exercise.id,
-        exercise_name: exercise.name,
-        exercise_type: exercise.type,
+        results.push({
+          exercise_id: exercise.id,
+          exercise_name: exercise.name,
+          exercise_type: exercise.type,
         value: topScore.value,
         created_at: topScore.createdAt.toISOString(),
         user_name: topScore.user.name,
