@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getWings, getWingsByRankAndName } from '@/lib/db';
+import { getWings, getWingsByName } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const rank = searchParams.get('rank');
     const name = searchParams.get('name');
     
-    // If rank and name are provided, filter wings by them
-    if (rank && name) {
-      const wings = await getWingsByRankAndName(rank, name);
+    // If name is provided, filter wings by name
+    if (name) {
+      const wings = await getWingsByName(name);
       return NextResponse.json(wings.map(w => w.wing));
     }
     

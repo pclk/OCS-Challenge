@@ -8,7 +8,6 @@ interface LeaderboardEntry {
   id: number;
   value: number;
   created_at: string;
-  rank: string | null;
   user_name: string;
   wing: string | null;
   user_id: number;
@@ -20,7 +19,6 @@ interface ExerciseBasedEntry {
   exercise_type: string;
   value: number;
   created_at: string;
-  rank: string | null;
   user_name: string;
   wing: string | null;
   user_id: number;
@@ -125,7 +123,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
           );
           if (lbResponse.ok) {
             const lbData = await lbResponse.json();
-            // Deduplicate entries: keep only latest entry for each unique combination of rank, name, wing, and value
+            // Deduplicate entries: keep only latest entry for each unique combination of name, wing, and value
             const deduplicatedData = deduplicateEntries(lbData);
             leaderboards[exercise.name] = deduplicatedData;
           } else {
@@ -152,8 +150,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   }, [fetchData]);
 
   const getDisplayName = (entry: LeaderboardEntry | ExerciseBasedEntry) => {
-    const rankPart = entry.rank ? `${entry.rank} ` : '';
-    return `${rankPart}${entry.user_name}`;
+    return entry.user_name;
   };
 
   // Pagination helpers for Exercise-Based View
@@ -313,7 +310,6 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                         <table className="w-full">
                           <thead>
                             <tr className="border-b border-white/20">
-                              <th className="text-left py-2 px-4 font-semibold text-white">Rank</th>
                               <th className="text-left py-2 px-4 font-semibold text-white">Name</th>
                               <th className="text-left py-2 px-4 font-semibold text-white">Wing</th>
                               <th className="text-right py-2 px-4 font-semibold text-white">

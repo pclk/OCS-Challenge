@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Wing {
+  id        Int      @id @default(autoincrement())
+  value     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("wings")
+}
+
+model Exercise {
+  id        Int          @id @default(autoincrement())
+  name      String       @unique
+  type      ExerciseType
+  createdAt DateTime     @default(now()) @map("created_at")
+  scores    Score[]
+
+  @@map("exercises")
+}
+
+model NameRankMapping {
+  id        Int      @id @default(autoincrement())
+  name      String
+  wing      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([name, wing])
+  @@map("name_rank_mappings")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  wing      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  scores    Score[]
+
+  @@map("users")
+}
+
+model Score {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  exerciseId Int      @map("exercise_id")
+  value      Int
+  createdAt  DateTime @default(now()) @map("created_at")
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([exerciseId, value(sort: Desc)])
+  @@index([userId])
+  @@map("scores")
+}
+
+enum ExerciseType {
+  rep
+  seconds
+}

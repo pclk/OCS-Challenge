@@ -1,12 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getNamesByRank } from '@/lib/db';
+import { NextResponse } from 'next/server';
+import { getAllNames } from '@/lib/db';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const rank = searchParams.get('rank');
-    
-    const names = await getNamesByRank(rank);
+    const names = await getAllNames();
     return NextResponse.json(names.map(n => n.name));
   } catch (error) {
     console.error('Error fetching names:', error);

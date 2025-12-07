@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import toast from 'react-hot-toast';
-import ExerciseForm from './components/ExerciseForm';
+import WingSelection from './components/WingSelection';
+import NameSelectionByWing from './components/NameSelectionByWing';
+import ExerciseScoresForm from './components/ExerciseScoresForm';
 import Leaderboard from './components/Leaderboard';
 
 interface Exercise {
@@ -16,6 +18,8 @@ export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [wings, setWings] = useState<string[]>([]);
+  const [selectedWing, setSelectedWing] = useState<string | null>(null);
+  const [selectedName, setSelectedName] = useState<string | null>(null);
 
   useEffect(() => {
     fetchExercises();
@@ -60,6 +64,25 @@ export default function Home() {
 
   const handleScoreSubmitted = () => {
     setRefreshKey((prev) => prev + 1);
+    // Reset to wing selection after successful submission
+    setSelectedWing(null);
+    setSelectedName(null);
+  };
+
+  const handleWingSelected = (wing: string) => {
+    setSelectedWing(wing);
+  };
+
+  const handleNameSelected = (name: string) => {
+    setSelectedName(name);
+  };
+
+  const handleBackFromName = () => {
+    setSelectedName(null);
+  };
+
+  const handleBackFromWing = () => {
+    setSelectedWing(null);
   };
 
   return (
@@ -78,7 +101,23 @@ export default function Home() {
           </h1>
         </div>
         <Leaderboard key={refreshKey} exercises={exercises} wings={wings} />
-        <ExerciseForm onScoreSubmitted={handleScoreSubmitted} exercises={exercises} />
+        {selectedWing && selectedName ? (
+          <ExerciseScoresForm
+            name={selectedName}
+            wing={selectedWing}
+            exercises={exercises}
+            onScoreSubmitted={handleScoreSubmitted}
+            onBack={handleBackFromName}
+          />
+        ) : selectedWing ? (
+          <NameSelectionByWing
+            wing={selectedWing}
+            onNameSelected={handleNameSelected}
+            onBack={handleBackFromWing}
+          />
+        ) : (
+          <WingSelection onWingSelected={handleWingSelected} />
+        )}
       </div>
     </main>
   );

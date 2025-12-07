@@ -1,32 +1,7 @@
-import { Pool } from 'pg';
+import { prisma } from './prisma';
 import path from 'path';
 import fs from 'fs';
-
-// Create PostgreSQL connection pool lazily
-// For Railway production: DATABASE_URL is automatically set by Railway
-// For local development: Use Railway's public connection string or set DATABASE_URL
-let pool: Pool | null = null;
-
-function getPool(): Pool {
-  if (!pool) {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL environment variable is required. Please set it in your environment variables.');
-    }
-    pool = new Pool({
-      connectionString,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    });
-  }
-  return pool;
-}
-
-function checkDatabaseAvailable(): void {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is required. Please set it in your environment variables.');
-  }
-}
+import { ExerciseType } from '@prisma/client';
 
 // Parse CSV file (generic parser)
 function parseCSV<T = Record<string, string>>(filePath: string): T[] {
@@ -50,292 +25,44 @@ function parseCSV<T = Record<string, string>>(filePath: string): T[] {
   });
 }
 
-// Check if table data already exists by comparing count
-async function checkTableDataExists(client: any, tableName: string, expectedCount: number): Promise<boolean> {
-  if (expectedCount === 0) return true; // No data to insert
-  
-  const result = await client.query(`SELECT COUNT(*) as count FROM ${tableName}`);
-  const existingCount = parseInt(result.rows[0].count, 10);
-  
-  // If counts match, data likely already exists
-  return existingCount >= expectedCount;
-}
-
-// Bulk insert helper function
-async function bulkInsert(
-  client: any,
-  tableName: string,
-  data: any[],
-  columns: string[],
-  conflictColumns: string[]
-): Promise<number> {
-  if (data.length === 0) return 0;
-  
-  // Batch size for bulk inserts (PostgreSQL has a limit on parameters)
-  const BATCH_SIZE = 1000;
-  let totalInserted = 0;
-  
-  for (let i = 0; i < data.length; i += BATCH_SIZE) {
-    const batch = data.slice(i, i + BATCH_SIZE);
-    const values: any[] = [];
-    const placeholders: string[] = [];
-    
-    batch.forEach((item, rowIndex) => {
-      const rowPlaceholders: string[] = [];
-      columns.forEach((col, colIndex) => {
-        const paramIndex = rowIndex * columns.length + colIndex + 1;
-        values.push(item[col]);
-        rowPlaceholders.push(`$${paramIndex}`);
-      });
-      placeholders.push(`(${rowPlaceholders.join(', ')})`);
-    });
-    
-    const conflictClause = conflictColumns.length > 0
-      ? `ON CONFLICT (${conflictColumns.join(', ')}) DO NOTHING`
-      : '';
-    
-    const query = `
-      INSERT INTO ${tableName} (${columns.join(', ')})
-      VALUES ${placeholders.join(', ')}
-      ${conflictClause}
-      RETURNING id
-    `;
-    
-    const result = await client.query(query, values);
-    totalInserted += result.rows.length;
-  }
-  
-  return totalInserted;
-}
-
-// Initialize database schema
+// Initialize database schema and seed data
 export async function initDatabase() {
   console.log('[DB] initDatabase - Starting database initialization...');
   const startTime = Date.now();
-  checkDatabaseAvailable();
-  const client = await getPool().connect();
+
   try {
-    // Get existing database schema before creating tables
-    console.log('[DB] initDatabase - Checking existing database schema...');
-    const tablesResult = await client.query(`
-      SELECT 
-        table_name,
-        table_schema
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-      ORDER BY table_name
-    `);
-    
-    const existingTables = tablesResult.rows.map(row => row.table_name);
-    console.log('[DB] initDatabase - Existing tables:', JSON.stringify({
-      count: existingTables.length,
-      tables: existingTables
-    }, null, 2));
-    
-    // Helper function to check if table exists (using in-memory array)
-    const tableExistsInMemory = (tableName: string): boolean => {
-      return existingTables.includes(tableName);
-    };
-    
-    console.log('[DB] initDatabase - Creating tables...');
-    // Create ranks table
-    if (!tableExistsInMemory('ranks')) {
-      await client.query(`
-        CREATE TABLE ranks (
-          id SERIAL PRIMARY KEY,
-          value TEXT NOT NULL UNIQUE,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      existingTables.push('ranks'); // Update in-memory array
-      console.log('[DB] initDatabase - Created ranks table');
-    } else {
-      console.log('[DB] initDatabase - Ranks table already exists, skipping creation');
-    }
+    // Check if data already exists
+    const existingWingsCount = await prisma.wing.count();
+    const existingExercisesCount = await prisma.exercise.count();
+    const existingMappingsCount = await prisma.nameRankMapping.count();
 
-    // Create wings table
-    if (!tableExistsInMemory('wings')) {
-      await client.query(`
-        CREATE TABLE wings (
-          id SERIAL PRIMARY KEY,
-          value TEXT NOT NULL UNIQUE,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      existingTables.push('wings'); // Update in-memory array
-      console.log('[DB] initDatabase - Created wings table');
-    } else {
-      console.log('[DB] initDatabase - Wings table already exists, skipping creation');
-    }
-
-    // Create exercises table
-    if (!tableExistsInMemory('exercises')) {
-      await client.query(`
-        CREATE TABLE exercises (
-          id SERIAL PRIMARY KEY,
-          name TEXT NOT NULL UNIQUE,
-          type TEXT NOT NULL CHECK(type IN ('rep', 'seconds')),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      existingTables.push('exercises'); // Update in-memory array
-      console.log('[DB] initDatabase - Created exercises table');
-    } else {
-      console.log('[DB] initDatabase - Exercises table already exists, skipping creation');
-    }
-
-    // Create name_rank_mappings table (includes wing for validation)
-    if (!tableExistsInMemory('name_rank_mappings')) {
-      await client.query(`
-        CREATE TABLE name_rank_mappings (
-          id SERIAL PRIMARY KEY,
-          name TEXT NOT NULL,
-          rank TEXT NOT NULL,
-          wing TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(name, rank, wing)
-        )
-      `);
-      existingTables.push('name_rank_mappings'); // Update in-memory array
-      console.log('[DB] initDatabase - Created name_rank_mappings table');
-    } else {
-      console.log('[DB] initDatabase - Name_rank_mappings table already exists, skipping creation');
-    }
-
-    // Migrate name_rank_mappings table if it doesn't have wing column
-    try {
-      await client.query(`ALTER TABLE name_rank_mappings ADD COLUMN wing TEXT`);
-      console.log('[DB] initDatabase - Added wing column to name_rank_mappings table');
-    } catch (e: any) {
-      // Column already exists, ignore (PostgreSQL error code 42701)
-      if (e.code !== '42701') {
-        throw e;
-      }
-    }
-
-    // Create users table
-    if (!tableExistsInMemory('users')) {
-      await client.query(`
-        CREATE TABLE users (
-          id SERIAL PRIMARY KEY,
-          rank TEXT,
-          name TEXT NOT NULL,
-          wing TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      existingTables.push('users'); // Update in-memory array
-      console.log('[DB] initDatabase - Created users table');
-    } else {
-      console.log('[DB] initDatabase - Users table already exists, skipping creation');
-    }
-
-    // Migrate existing users table if it doesn't have rank and wing columns
-    try {
-      await client.query(`ALTER TABLE users ADD COLUMN rank TEXT`);
-      console.log('[DB] initDatabase - Added rank column to users table');
-    } catch (e: any) {
-      // Column already exists, ignore (PostgreSQL error code 42701)
-      if (e.code !== '42701') {
-        throw e;
-      }
-    }
-
-    try {
-      await client.query(`ALTER TABLE users ADD COLUMN wing TEXT`);
-      console.log('[DB] initDatabase - Added wing column to users table');
-    } catch (e: any) {
-      // Column already exists, ignore (PostgreSQL error code 42701)
-      if (e.code !== '42701') {
-        throw e;
-      }
-    }
-
-    // Create scores table
-    if (!tableExistsInMemory('scores')) {
-      await client.query(`
-        CREATE TABLE scores (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL,
-          exercise_id INTEGER NOT NULL,
-          value INTEGER NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id),
-          FOREIGN KEY (exercise_id) REFERENCES exercises(id)
-        )
-      `);
-      existingTables.push('scores'); // Update in-memory array
-      console.log('[DB] initDatabase - Created scores table');
-    } else {
-      console.log('[DB] initDatabase - Scores table already exists, skipping creation');
-    }
-
-    // Create indexes for better query performance
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_scores_exercise_value ON scores(exercise_id, value DESC);
-      CREATE INDEX IF NOT EXISTS idx_scores_user ON scores(user_id);
-      CREATE INDEX IF NOT EXISTS idx_users_wing ON users(wing);
-      CREATE INDEX IF NOT EXISTS idx_name_rank_mappings_rank ON name_rank_mappings(rank);
-    `);
-    console.log('[DB] initDatabase - Tables and indexes created');
-
-    // Check if data already exists before loading CSV files
-    const ranksCount = await client.query('SELECT COUNT(*) as count FROM ranks');
-    const wingsCount = await client.query('SELECT COUNT(*) as count FROM wings');
-    const exercisesCount = await client.query('SELECT COUNT(*) as count FROM exercises');
-    const mappingsCount = await client.query('SELECT COUNT(*) as count FROM name_rank_mappings');
-    
-    const existingRanksCount = parseInt(ranksCount.rows[0].count, 10);
-    const existingWingsCount = parseInt(wingsCount.rows[0].count, 10);
-    const existingExercisesCount = parseInt(exercisesCount.rows[0].count, 10);
-    const existingMappingsCount = parseInt(mappingsCount.rows[0].count, 10);
-
-    let ranksInserted = 0;
     let wingsInserted = 0;
     let exercisesInserted = 0;
     let mappingsInserted = 0;
-    let validRanks: Array<{ value: string }> = [];
     let validWings: Array<{ value: string }> = [];
     let validExercises: Array<{ name: string; type: string }> = [];
-    let validPersonnel: Array<{ rank: string; name: string; wing: string }> = [];
+    let validPersonnel: Array<{ name: string; wing: string }> = [];
 
-    // Only load and insert ranks if table is empty or has insufficient data
-    if (existingRanksCount === 0) {
-      const ranksPath = path.join(process.cwd(), 'data', 'ranks.csv');
-      const ranks = parseCSV<{ value: string }>(ranksPath);
-      console.log('[DB] initDatabase - Loaded ranks from CSV');
-      validRanks = ranks.filter(r => r.value);
-      
-      ranksInserted = await bulkInsert(
-        client,
-        'ranks',
-        validRanks,
-        ['value'],
-        ['value']
-      );
-      console.log('[DB] initDatabase - Inserted ranks:', JSON.stringify({
-        total: validRanks.length,
-        inserted: ranksInserted,
-        skipped: validRanks.length - ranksInserted
-      }, null, 2));
-    } else {
-      console.log('[DB] initDatabase - Ranks data already exists (count: ' + existingRanksCount + '), skipping CSV load and insertion');
-    }
-
-    // Only load and insert wings if table is empty or has insufficient data
+    // Only load and insert wings if table is empty
     if (existingWingsCount === 0) {
       const wingsPath = path.join(process.cwd(), 'data', 'wings.csv');
       const wings = parseCSV<{ value: string }>(wingsPath);
       console.log('[DB] initDatabase - Loaded wings from CSV');
       validWings = wings.filter(w => w.value);
       
-      wingsInserted = await bulkInsert(
-        client,
-        'wings',
-        validWings,
-        ['value'],
-        ['value']
-      );
+      for (const wing of validWings) {
+        try {
+          await prisma.wing.create({
+            data: { value: wing.value },
+          });
+          wingsInserted++;
+        } catch (error: any) {
+          // Ignore unique constraint errors
+          if (error.code !== 'P2002') {
+            throw error;
+          }
+        }
+      }
       console.log('[DB] initDatabase - Inserted wings:', JSON.stringify({
         total: validWings.length,
         inserted: wingsInserted,
@@ -345,20 +72,29 @@ export async function initDatabase() {
       console.log('[DB] initDatabase - Wings data already exists (count: ' + existingWingsCount + '), skipping CSV load and insertion');
     }
 
-    // Only load and insert exercises if table is empty or has insufficient data
+    // Only load and insert exercises if table is empty
     if (existingExercisesCount === 0) {
       const exercisePath = path.join(process.cwd(), 'data', 'exercise.csv');
       const exercises = parseCSV<{ name: string; type: string }>(exercisePath);
       console.log('[DB] initDatabase - Loaded exercises from CSV');
       validExercises = exercises.filter(e => e.name && e.type);
       
-      exercisesInserted = await bulkInsert(
-        client,
-        'exercises',
-        validExercises,
-        ['name', 'type'],
-        ['name']
-      );
+      for (const exercise of validExercises) {
+        try {
+          await prisma.exercise.create({
+            data: {
+              name: exercise.name,
+              type: exercise.type as ExerciseType,
+            },
+          });
+          exercisesInserted++;
+        } catch (error: any) {
+          // Ignore unique constraint errors
+          if (error.code !== 'P2002') {
+            throw error;
+          }
+        }
+      }
       console.log('[DB] initDatabase - Inserted exercises:', JSON.stringify({
         total: validExercises.length,
         inserted: exercisesInserted,
@@ -368,27 +104,39 @@ export async function initDatabase() {
       console.log('[DB] initDatabase - Exercises data already exists (count: ' + existingExercisesCount + '), skipping CSV load and insertion');
     }
 
-    // Only load and insert name-rank-wing mappings if table is empty or has insufficient data
+    // Only load and insert name-wing mappings if table is empty
     if (existingMappingsCount === 0) {
       const personnelPath = path.join(process.cwd(), 'data', 'personnel.csv');
-      const personnel = parseCSV<{ rank: string; name: string; wing: string }>(personnelPath);
+      const personnel = parseCSV<{ name: string; wing: string }>(personnelPath);
       console.log('[DB] initDatabase - Loaded personnel from CSV');
-      validPersonnel = personnel.filter(p => p.name && p.rank && p.wing);
+      // Filter and map to name-wing only
+      validPersonnel = personnel
+        .filter(p => p.name && p.wing)
+        .map(p => ({ name: p.name, wing: p.wing }));
       
-      mappingsInserted = await bulkInsert(
-        client,
-        'name_rank_mappings',
-        validPersonnel,
-        ['name', 'rank', 'wing'],
-        ['name', 'rank', 'wing']
-      );
-      console.log('[DB] initDatabase - Inserted name-rank-wing mappings:', JSON.stringify({
+      for (const person of validPersonnel) {
+        try {
+          await prisma.nameRankMapping.create({
+            data: {
+              name: person.name,
+              wing: person.wing,
+            } as any
+          });
+          mappingsInserted++;
+        } catch (error: any) {
+          // Ignore unique constraint errors
+          if (error.code !== 'P2002') {
+            throw error;
+          }
+        }
+      }
+      console.log('[DB] initDatabase - Inserted name-wing mappings:', JSON.stringify({
         total: validPersonnel.length,
         inserted: mappingsInserted,
         skipped: validPersonnel.length - mappingsInserted
       }, null, 2));
     } else {
-      console.log('[DB] initDatabase - Name-rank-wing mappings data already exists (count: ' + existingMappingsCount + '), skipping CSV load and insertion');
+      console.log('[DB] initDatabase - Name-wing mappings data already exists (count: ' + existingMappingsCount + '), skipping CSV load and insertion');
     }
 
     const duration = Date.now() - startTime;
@@ -396,11 +144,6 @@ export async function initDatabase() {
       function: 'initDatabase',
       duration: `${duration}ms`,
       summary: {
-        ranks: { 
-          existing: existingRanksCount, 
-          loaded: validRanks.length, 
-          inserted: ranksInserted 
-        },
         wings: { 
           existing: existingWingsCount, 
           loaded: validWings.length, 
@@ -418,59 +161,34 @@ export async function initDatabase() {
         }
       }
     }, null, 2));
-  } finally {
-    client.release();
+  } catch (error) {
+    console.error('[DB] initDatabase - Error:', error);
+    throw error;
   }
 }
 
 // Warm /wings and /names routes by pre-fetching data
 async function warmRoutes() {
-  console.log('[DB] warmRoutes - Starting to warm /wings and /names routes...');
-  const warmStartTime = Date.now();
   try {
     // Get base URL for API requests
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
     
-    // Warm /wings route (single fetch request)
+    // Warm /wings route
     try {
-      const wingsResponse = await fetch(`${baseUrl}/api/wings`);
-      const wingsData = await wingsResponse.json();
-      console.log('[DB] warmRoutes - Warmed /wings route:', JSON.stringify({
-        route: '/api/wings',
-        status: wingsResponse.status,
-        count: Array.isArray(wingsData) ? wingsData.length : 0
-      }, null, 2));
+      await fetch(`${baseUrl}/api/wings`);
     } catch (error) {
-      console.error('[DB] warmRoutes - Error warming /api/wings:', error);
+      // Silently fail - warming is non-critical
     }
 
-    // Warm /names route (single fetch request with first available rank)
-    const allRanks = await getRanks();
-    if (allRanks.length > 0) {
-      try {
-        const namesResponse = await fetch(`${baseUrl}/api/names?rank=${encodeURIComponent(allRanks[0].value)}`);
-        const namesData = await namesResponse.json();
-        console.log('[DB] warmRoutes - Warmed /names route:', JSON.stringify({
-          route: '/api/names',
-          status: namesResponse.status,
-          rank: allRanks[0].value,
-          count: Array.isArray(namesData) ? namesData.length : 0
-        }, null, 2));
-      } catch (error) {
-        console.error('[DB] warmRoutes - Error warming /api/names:', error);
-      }
+    // Warm /names route
+    try {
+      await fetch(`${baseUrl}/api/names`);
+    } catch (error) {
+      // Silently fail - warming is non-critical
     }
-
-    const warmDuration = Date.now() - warmStartTime;
-    console.log('[DB] warmRoutes - Route warming completed:', JSON.stringify({
-      function: 'warmRoutes',
-      duration: `${warmDuration}ms`,
-      routesWarmed: ['/api/wings', '/api/names']
-    }, null, 2));
   } catch (error) {
-    console.error('[DB] warmRoutes - Error warming routes:', error);
-    // Don't throw - warming is non-critical
+    // Silently fail - warming is non-critical
   }
 }
 
@@ -503,256 +221,310 @@ async function ensureInitialized() {
   }
 }
 
-// Get or create user by rank, name, and wing
-export async function getOrCreateUser(rank: string, name: string, wing: string): Promise<number> {
-  checkDatabaseAvailable();
-  await ensureInitialized();
-  const client = await getPool().connect();
+// Get or create user by name and wing
+export async function getOrCreateUser(name: string, wing: string): Promise<number> {
+  console.log('[DB] getOrCreateUser - Called with:', { name, wing });
   try {
-    const result = await client.query(
-      'SELECT id FROM users WHERE rank = $1 AND name = $2 AND wing = $3',
-      [rank, name, wing]
-    );
+    await ensureInitialized();
+    
+    console.log('[DB] getOrCreateUser - Searching for existing user with raw SQL:', { name, wing });
+    // Use raw SQL to avoid Prisma adapter issues
+    const existingUsers = await prisma.$queryRaw<Array<{ id: number }>>`
+      SELECT id 
+      FROM users 
+      WHERE name = ${name} AND wing = ${wing}
+      LIMIT 1
+    `;
 
-    if (result.rows.length > 0) {
-      const userId = result.rows[0].id;
-      console.log('[DB] getOrCreateUser - Retrieved existing user (first 3 rows):', JSON.stringify({
+    if (existingUsers.length > 0) {
+      const existingUser = existingUsers[0];
+      console.log('[DB] getOrCreateUser - Retrieved existing user:', JSON.stringify({
         function: 'getOrCreateUser',
-        parameters: { rank, name, wing },
-        result: { userId, action: 'retrieved' },
-        data: result.rows.slice(0, 3)
+        parameters: { name, wing },
+        result: { userId: existingUser.id, action: 'retrieved' },
       }, null, 2));
-      return userId;
+      return existingUser.id;
     }
 
-    const insertResult = await client.query(
-      'INSERT INTO users (rank, name, wing) VALUES ($1, $2, $3) RETURNING id',
-      [rank, name, wing]
-    );
-    const newUserId = insertResult.rows[0].id;
-    console.log('[DB] getOrCreateUser - Created new user (first 3 rows):', JSON.stringify({
+    console.log('[DB] getOrCreateUser - No existing user found, creating new user:', { name, wing });
+    // Use raw SQL for insert as well to avoid adapter issues
+    const insertResult = await prisma.$queryRaw<Array<{ id: number }>>`
+      INSERT INTO users (name, wing, created_at)
+      VALUES (${name}, ${wing}, NOW())
+      RETURNING id
+    `;
+    
+    const newUser = insertResult[0];
+    console.log('[DB] getOrCreateUser - Created new user:', JSON.stringify({
       function: 'getOrCreateUser',
-      parameters: { rank, name, wing },
-      result: { userId: newUserId, action: 'created' },
-      data: insertResult.rows.slice(0, 3)
+      parameters: { name, wing },
+      result: { userId: newUser.id, action: 'created' },
     }, null, 2));
-    return newUserId;
-  } finally {
-    client.release();
-  }
-}
-
-// Get all ranks
-export async function getRanks() {
-  checkDatabaseAvailable();
-  await ensureInitialized();
-  const client = await getPool().connect();
-  try {
-    const result = await client.query('SELECT value FROM ranks ORDER BY value');
-    const rows = result.rows as Array<{ value: string }>;
-    console.log('[DB] getRanks - Retrieved ranks (first 3 rows):', JSON.stringify({
-      function: 'getRanks',
-      parameters: {},
-      result: { count: rows.length },
-      data: rows.slice(0, 3)
-    }, null, 2));
-    return rows;
-  } finally {
-    client.release();
+    return newUser.id;
+  } catch (error: any) {
+    console.error('[DB] getOrCreateUser - Error occurred:', {
+      error: error?.message,
+      code: error?.code,
+      cause: error?.cause,
+      originalCode: error?.cause?.originalCode,
+      originalMessage: error?.cause?.originalMessage,
+      stack: error?.stack?.split('\n').slice(0, 10)
+    });
+    throw error;
   }
 }
 
 // Get all wings
 export async function getWings() {
-  checkDatabaseAvailable();
   await ensureInitialized();
-  const client = await getPool().connect();
-  try {
-    const result = await client.query('SELECT value FROM wings ORDER BY value');
-    const rows = result.rows as Array<{ value: string }>;
-    console.log('[DB] getWings - Retrieved wings (first 3 rows):', JSON.stringify({
-      function: 'getWings',
-      parameters: {},
-      result: { count: rows.length },
-      data: rows.slice(0, 3)
-    }, null, 2));
-    return rows;
-  } finally {
-    client.release();
-  }
+  const wings = await prisma.wing.findMany({
+    orderBy: { value: 'asc' },
+  });
+  console.log('[DB] getWings - Retrieved wings:', JSON.stringify({
+    function: 'getWings',
+    parameters: {},
+    result: { count: wings.length },
+    data: wings.slice(0, 3)
+  }, null, 2));
+  return wings;
 }
 
-// Get names by rank (returns empty array if no rank specified or no matches)
-export async function getNamesByRank(rank?: string | null) {
-  if (!rank) {
-    console.log('[DB] getNamesByRank - No rank provided, returning empty array:', JSON.stringify({
-      function: 'getNamesByRank',
-      parameters: { rank: null },
+// Get wings by name (returns empty array if no matches)
+export async function getWingsByName(name?: string | null) {
+  if (!name) {
+    console.log('[DB] getWingsByName - No name provided, returning empty array:', JSON.stringify({
+      function: 'getWingsByName',
+      parameters: { name: null },
       result: { count: 0 },
       data: []
     }, null, 2));
     return [];
   }
-  checkDatabaseAvailable();
   await ensureInitialized();
-  const client = await getPool().connect();
-  try {
-    const result = await client.query(
-      'SELECT DISTINCT name FROM name_rank_mappings WHERE rank = $1 ORDER BY name',
-      [rank]
-    );
-    const rows = result.rows as Array<{ name: string }>;
-    console.log('[DB] getNamesByRank - Retrieved names:', JSON.stringify({
-      function: 'getNamesByRank',
-      parameters: { rank },
-      result: { count: rows.length },
-      data: rows
-    }, null, 2));
-    return rows;
-  } finally {
-    client.release();
-  }
+  const mappings = await prisma.nameRankMapping.findMany({
+    where: { name },
+    select: { wing: true },
+    distinct: ['wing'],
+    orderBy: { wing: 'asc' },
+  });
+  const wings = mappings.map((m: { wing: string }) => ({ wing: m.wing }));
+  console.log('[DB] getWingsByName - Retrieved wings:', JSON.stringify({
+    function: 'getWingsByName',
+    parameters: { name },
+    result: { count: wings.length },
+    data: wings.slice(0, 3)
+  }, null, 2));
+  return wings;
 }
 
-// Get wings by rank and name (returns empty array if no matches)
-export async function getWingsByRankAndName(rank?: string | null, name?: string | null) {
-  if (!rank || !name) {
-    console.log('[DB] getWingsByRankAndName - Missing parameters, returning empty array:', JSON.stringify({
-      function: 'getWingsByRankAndName',
-      parameters: { rank, name },
-      result: { count: 0 },
-      data: []
-    }, null, 2));
-    return [];
-  }
-  checkDatabaseAvailable();
+// Get all names
+export async function getAllNames() {
   await ensureInitialized();
-  const client = await getPool().connect();
-  try {
-    const result = await client.query(
-      'SELECT DISTINCT wing FROM name_rank_mappings WHERE rank = $1 AND name = $2 ORDER BY wing',
-      [rank, name]
-    );
-    const rows = result.rows as Array<{ wing: string }>;
-    console.log('[DB] getWingsByRankAndName - Retrieved wings (first 3 rows):', JSON.stringify({
-      function: 'getWingsByRankAndName',
-      parameters: { rank, name },
-      result: { count: rows.length },
-      data: rows.slice(0, 3)
+  const mappings = await prisma.nameRankMapping.findMany({
+    select: { name: true },
+    distinct: ['name'],
+    orderBy: { name: 'asc' },
+  });
+  const names = mappings.map((m: { name: string }) => ({ name: m.name }));
+  console.log('[DB] getAllNames - Retrieved names:', JSON.stringify({
+    function: 'getAllNames',
+    parameters: {},
+    result: { count: names.length },
+    data: names.slice(0, 3)
+  }, null, 2));
+  return names;
+}
+
+// Get user info (wing) by name (returns first match if multiple exist)
+export async function getUserInfoByName(name: string) {
+  console.log('[DB] getUserInfoByName - Called with name:', name);
+  if (!name) {
+    console.log('[DB] getUserInfoByName - No name provided, returning null:', JSON.stringify({
+      function: 'getUserInfoByName',
+      parameters: { name: null },
+      result: { found: false }
     }, null, 2));
-    return rows;
-  } finally {
-    client.release();
+    return null;
+  }
+  try {
+    await ensureInitialized();
+    console.log('[DB] getUserInfoByName - Database initialized, executing raw SQL query');
+    
+    // Use raw SQL query to avoid Prisma adapter issues with the model name containing "rank"
+    // The model name "NameRankMapping" might be causing Prisma to generate incorrect SQL with RANK()
+    const result = await prisma.$queryRaw<Array<{ wing: string }>>`
+      SELECT wing 
+      FROM name_rank_mappings 
+      WHERE name = ${name}
+      LIMIT 1
+    `;
+    
+    console.log('[DB] getUserInfoByName - Raw SQL query executed successfully:', {
+      resultCount: result.length,
+      firstResult: result[0] || null
+    });
+    
+    const mapping = result[0] || null;
+    const userInfo = mapping ? { wing: mapping.wing } : null;
+    console.log('[DB] getUserInfoByName - Retrieved user info:', JSON.stringify({
+      function: 'getUserInfoByName',
+      parameters: { name },
+      result: { found: !!userInfo },
+      data: userInfo ? [userInfo] : null
+    }, null, 2));
+    return userInfo;
+  } catch (error: any) {
+    console.error('[DB] getUserInfoByName - Error occurred:', {
+      error: error?.message,
+      code: error?.code,
+      cause: error?.cause,
+      originalCode: error?.cause?.originalCode,
+      originalMessage: error?.cause?.originalMessage,
+      stack: error?.stack?.split('\n').slice(0, 10)
+    });
+    throw error;
   }
 }
 
 // Get all exercises
 export async function getExercises() {
-  checkDatabaseAvailable();
   await ensureInitialized();
-  const client = await getPool().connect();
-  try {
-    const result = await client.query('SELECT * FROM exercises ORDER BY name');
-    const rows = result.rows as Array<{ id: number; name: string; type: string; created_at: string }>;
-    console.log('[DB] getExercises - Retrieved exercises (first 3 rows):', JSON.stringify({
-      function: 'getExercises',
-      parameters: {},
-      result: { count: rows.length },
-      data: rows.slice(0, 3)
-    }, null, 2));
-    return rows;
-  } finally {
-    client.release();
-  }
+  const exercises = await prisma.exercise.findMany({
+    orderBy: { name: 'asc' },
+  });
+  console.log('[DB] getExercises - Retrieved exercises:', JSON.stringify({
+    function: 'getExercises',
+    parameters: {},
+    result: { count: exercises.length },
+    data: exercises.slice(0, 3)
+  }, null, 2));
+  return exercises;
 }
 
 // Get exercise by id
 export async function getExerciseById(id: number) {
-  checkDatabaseAvailable();
   await ensureInitialized();
-  const client = await getPool().connect();
-  try {
-    const result = await client.query('SELECT * FROM exercises WHERE id = $1', [id]);
-    const row = result.rows[0] as { id: number; name: string; type: string; created_at: string } | undefined;
-    console.log('[DB] getExerciseById - Retrieved exercise (first 3 rows):', JSON.stringify({
-      function: 'getExerciseById',
-      parameters: { id },
-      result: { found: !!row },
-      data: row ? [row] : null
-    }, null, 2));
-    return row;
-  } finally {
-    client.release();
-  }
+  const exercise = await prisma.exercise.findUnique({
+    where: { id },
+  });
+  console.log('[DB] getExerciseById - Retrieved exercise:', JSON.stringify({
+    function: 'getExerciseById',
+    parameters: { id },
+    result: { found: !!exercise },
+    data: exercise ? [exercise] : null
+  }, null, 2));
+  return exercise;
 }
 
 // Create a score
 export async function createScore(userId: number, exerciseId: number, value: number) {
-  checkDatabaseAvailable();
   await ensureInitialized();
-  const client = await getPool().connect();
+  await prisma.score.create({
+    data: {
+      userId,
+      exerciseId,
+      value,
+    },
+  });
+}
+
+// Create multiple scores (bulk)
+export async function createScores(scores: Array<{ userId: number; exerciseId: number; value: number }>) {
+  console.log('[DB] createScores - Called with scores:', {
+    count: scores.length,
+    scores: scores.slice(0, 3) // Log first 3 for debugging
+  });
+  
+  await ensureInitialized();
+  
+  if (scores.length === 0) {
+    console.log('[DB] createScores - No scores to create, returning early');
+    return;
+  }
+  
   try {
-    await client.query(
-      'INSERT INTO scores (user_id, exercise_id, value) VALUES ($1, $2, $3)',
-      [userId, exerciseId, value]
-    );
-  } finally {
-    client.release();
+    const dataToInsert = scores.map(score => ({
+      userId: score.userId,
+      exerciseId: score.exerciseId,
+      value: score.value,
+    }));
+    
+    console.log('[DB] createScores - About to execute createMany:', {
+      dataCount: dataToInsert.length,
+      firstRecord: dataToInsert[0],
+      skipDuplicates: true
+    });
+    
+    // Use createMany for bulk insert - more efficient and avoids transaction issues with adapter
+    const result = await prisma.score.createMany({
+      data: dataToInsert,
+      skipDuplicates: true, // Skip if duplicate score exists
+    });
+    
+    console.log('[DB] createScores - createMany executed successfully:', {
+      count: result.count
+    });
+  } catch (error: any) {
+    console.error('[DB] createScores - Error occurred:', {
+      error: error?.message,
+      code: error?.code,
+      cause: error?.cause,
+      originalCode: error?.cause?.originalCode,
+      originalMessage: error?.cause?.originalMessage,
+      stack: error?.stack?.split('\n').slice(0, 10)
+    });
+    throw error;
   }
 }
 
 // Get leaderboard for a specific exercise (top N, sorted by highest rep, optionally filtered by wing)
 export async function getLeaderboard(exerciseId: number, limit: number = 10, wing?: string | null) {
-  checkDatabaseAvailable();
   await ensureInitialized();
-  const client = await getPool().connect();
-  try {
-    let query = `
-      SELECT 
-        s.id,
-        s.value,
-        s.created_at,
-        u.rank,
-        u.name as user_name,
-        u.wing,
-        u.id as user_id
-      FROM scores s
-      JOIN users u ON s.user_id = u.id
-      WHERE s.exercise_id = $1
-    `;
-    
-    const params: any[] = [exerciseId];
-    let paramIndex = 2;
-    
-    if (wing && wing !== 'OCS LEVEL') {
-      query += ` AND u.wing = $${paramIndex}`;
-      params.push(wing);
-      paramIndex++;
-    }
-    
-    query += ` ORDER BY s.value DESC, s.created_at DESC LIMIT $${paramIndex}`;
-    params.push(limit);
-    
-    const result = await client.query(query, params);
-    const rows = result.rows as Array<{
-      id: number;
-      value: number;
-      created_at: string;
-      rank: string | null;
-      user_name: string;
-      wing: string | null;
-      user_id: number;
-    }>;
-    console.log('[DB] getLeaderboard - Retrieved leaderboard (first 3 rows):', JSON.stringify({
-      function: 'getLeaderboard',
-      parameters: { exerciseId, limit, wing: wing || null },
-      result: { count: rows.length },
-      data: rows.slice(0, 3)
-    }, null, 2));
-    return rows;
-  } finally {
-    client.release();
+  
+  const where: any = {
+    exerciseId,
+  };
+  
+  if (wing && wing !== 'OCS LEVEL') {
+    where.user = {
+      wing,
+    };
   }
+  
+  const scores = await prisma.score.findMany({
+    where,
+    take: limit,
+    orderBy: [
+      { value: 'desc' },
+      { createdAt: 'desc' },
+    ],
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          wing: true,
+        },
+      },
+    },
+  });
+  
+  const rows = scores.map(s => ({
+    id: s.id,
+    value: s.value,
+    created_at: s.createdAt.toISOString(),
+    user_name: s.user.name,
+    wing: s.user.wing,
+    user_id: s.user.id,
+  }));
+  
+  console.log('[DB] getLeaderboard - Retrieved leaderboard:', JSON.stringify({
+    function: 'getLeaderboard',
+    parameters: { exerciseId, limit, wing: wing || null },
+    result: { count: rows.length },
+    data: rows.slice(0, 3)
+  }, null, 2));
+  return rows;
 }
 
 // Get exercise-based leaderboard (highest rep per exercise, optionally filtered by wing)
@@ -765,65 +537,54 @@ export async function getExerciseBasedLeaderboard(wing?: string | null) {
     exercise_type: string;
     value: number;
     created_at: string;
-    rank: string | null;
     user_name: string;
     wing: string | null;
     user_id: number;
   }> = [];
 
-  const client = await getPool().connect();
-  try {
-    for (const exercise of exercises) {
-      let query = `
-        SELECT 
-          s.id,
-          s.value,
-          s.created_at,
-          u.rank,
-          u.name as user_name,
-          u.wing,
-          u.id as user_id
-        FROM scores s
-        JOIN users u ON s.user_id = u.id
-        WHERE s.exercise_id = $1
-      `;
-      
-      const params: any[] = [exercise.id];
-      let paramIndex = 2;
-      
-      if (wing && wing !== 'OCS LEVEL') {
-        query += ` AND u.wing = $${paramIndex}`;
-        params.push(wing);
-        paramIndex++;
-      }
-      
-      query += ` ORDER BY s.value DESC, s.created_at DESC LIMIT 1`;
-      
-      const result = await client.query(query, params);
-      const row = result.rows[0] as {
-        id: number;
-        value: number;
-        created_at: string;
-        rank: string | null;
-        user_name: string;
-        wing: string | null;
-        user_id: number;
-      } | undefined;
-
-      if (row) {
-        results.push({
-          exercise_id: exercise.id,
-          exercise_name: exercise.name,
-          exercise_type: exercise.type,
-          ...row,
-        });
-      }
+  for (const exercise of exercises) {
+    const where: any = {
+      exerciseId: exercise.id,
+    };
+    
+    if (wing && wing !== 'OCS LEVEL') {
+      where.user = {
+        wing,
+      };
     }
-  } finally {
-    client.release();
+    
+    const topScore = await prisma.score.findFirst({
+      where,
+      orderBy: [
+        { value: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            wing: true,
+          },
+        },
+      },
+    });
+
+    if (topScore) {
+      results.push({
+        exercise_id: exercise.id,
+        exercise_name: exercise.name,
+        exercise_type: exercise.type,
+        value: topScore.value,
+        created_at: topScore.createdAt.toISOString(),
+        user_name: topScore.user.name,
+        wing: topScore.user.wing,
+        user_id: topScore.user.id,
+      });
+    }
   }
 
-  console.log('[DB] getExerciseBasedLeaderboard - Retrieved exercise-based leaderboard (first 3 rows):', JSON.stringify({
+  console.log('[DB] getExerciseBasedLeaderboard - Retrieved exercise-based leaderboard:', JSON.stringify({
     function: 'getExerciseBasedLeaderboard',
     parameters: { wing: wing || null },
     result: { count: results.length },
@@ -840,7 +601,6 @@ export async function getAllLeaderboards(limit: number = 10, wing?: string | nul
     id: number;
     value: number;
     created_at: string;
-    rank: string | null;
     user_name: string;
     wing: string | null;
     user_id: number;
@@ -850,7 +610,7 @@ export async function getAllLeaderboards(limit: number = 10, wing?: string | nul
     leaderboards[exercise.name] = await getLeaderboard(exercise.id, limit, wing);
   }
 
-  console.log('[DB] getAllLeaderboards - Retrieved all leaderboards (first 3 rows):', JSON.stringify({
+  console.log('[DB] getAllLeaderboards - Retrieved all leaderboards:', JSON.stringify({
     function: 'getAllLeaderboards',
     parameters: { limit, wing: wing || null },
     result: { 
@@ -861,5 +621,3 @@ export async function getAllLeaderboards(limit: number = 10, wing?: string | nul
   }, null, 2));
   return leaderboards;
 }
-
-export default getPool;
