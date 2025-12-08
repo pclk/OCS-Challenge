@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import SearchableDropdown from './SearchableDropdown';
+import ExerciseIcon from './ExerciseIcon';
 
 interface LeaderboardEntry {
   id: number;
@@ -24,6 +25,15 @@ interface ExerciseBasedEntry {
   user_id: number;
 }
 
+interface TotalRepsEntry {
+  rank: number;
+  user_id: number;
+  user_name: string;
+  wing: string | null;
+  total_reps: number;
+  achieved_goal: boolean;
+}
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   const day = String(date.getDate()).padStart(2, '0');
@@ -41,14 +51,16 @@ interface LeaderboardProps {
 }
 
 export default function Leaderboard({ exercises, wings: allWings }: LeaderboardProps) {
-  const [activeTab, setActiveTab] = useState<'exercise' | 'all'>('exercise');
+  const [activeTab, setActiveTab] = useState<'exercise' | 'all' | 'total'>('exercise');
   const [wing, setWing] = useState('OCS LEVEL');
   const [exerciseBasedData, setExerciseBasedData] = useState<ExerciseBasedEntry[]>([]);
   const [allData, setAllData] = useState<Record<string, LeaderboardEntry[]>>({});
+  const [totalRepsData, setTotalRepsData] = useState<TotalRepsEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [exercisePages, setExercisePages] = useState<Record<string, number>>({});
   const itemsPerPage = 10;
+  const GOAL_REPS = 20260;
   // Add OCS LEVEL at the beginning for the filter
   const wings = ['OCS LEVEL', ...allWings];
 
@@ -95,7 +107,19 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     setLoading(true);
     const loadingToast = toast.loading('Loading leaderboard...');
     try {
-      if (activeTab === 'exercise') {
+      if (activeTab === 'total') {
+        const response = await fetch('/api/total-reps');
+        if (response.ok) {
+          const data = await response.json();
+          console.log('total reps leaderboard fetched:', data);
+          setTotalRepsData(data);
+          toast.dismiss(loadingToast);
+        } else {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch total reps leaderboard' }));
+          toast.dismiss(loadingToast);
+          toast.error(errorData.error || 'Failed to fetch total reps leaderboard');
+        }
+      } else if (activeTab === 'exercise') {
         const response = await fetch(`/api/exercise-leaderboard?wing=${encodeURIComponent(wing)}`);
         if (response.ok) {
           const data = await response.json();
@@ -159,6 +183,111 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   const endIndexExercise = startIndexExercise + itemsPerPage;
   const paginatedExerciseData = exerciseBasedData.slice(startIndexExercise, endIndexExercise);
 
+  // Pagination helpers for Total Reps View
+  const totalPagesTotalReps = Math.ceil(totalRepsData.length / itemsPerPage);
+  const startIndexTotalReps = (currentPage - 1) * itemsPerPage;
+  const endIndexTotalReps = startIndexTotalReps + itemsPerPage;
+  const paginatedTotalRepsData = totalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
+
+  // Export to CSV functions for different tabs
+  const exportTotalRepsToCSV = () => {
+    const headers = ['Rank', 'Name', 'Wing', 'Total Reps', 'Achieved Goal (20260)'];
+    const rows = totalRepsData.map(entry => [
+      entry.rank,
+      entry.user_name,
+      entry.wing || '-',
+      entry.total_reps,
+      entry.achieved_goal ? 'Yes' : 'No'
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `total-reps-leaderboard-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('CSV exported successfully!');
+  };
+
+  const exportExerciseBasedToCSV = () => {
+    const headers = ['Exercise', 'Name', 'Wing', 'Reps', 'Date'];
+    const rows = exerciseBasedData.map(entry => [
+      entry.exercise_name,
+      entry.user_name,
+      entry.wing || '-',
+      entry.value,
+      formatDate(entry.created_at)
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `exercise-based-leaderboard-${wing}-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('CSV exported successfully!');
+  };
+
+  const exportAllScoresToCSV = () => {
+    const allRows: string[][] = [];
+    const headers = ['Exercise', 'Name', 'Wing', 'Reps', 'Date'];
+    
+    exercises.forEach(exercise => {
+      const entries = allData[exercise.name] || [];
+      entries.forEach(entry => {
+        allRows.push([
+          exercise.name,
+          entry.user_name,
+          entry.wing || '-',
+          entry.value.toString(),
+          formatDate(entry.created_at)
+        ]);
+      });
+    });
+    
+    const csvContent = [
+      headers.join(','),
+      ...allRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `all-scores-leaderboard-${wing}-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('CSV exported successfully!');
+  };
+
+  const handleExport = () => {
+    if (activeTab === 'total') {
+      exportTotalRepsToCSV();
+    } else if (activeTab === 'exercise') {
+      exportExerciseBasedToCSV();
+    } else {
+      exportAllScoresToCSV();
+    }
+  };
+
   // Pagination helpers for All Scores View
   const getExercisePage = (exerciseName: string) => exercisePages[exerciseName] || 1;
   const setExercisePage = (exerciseName: string, page: number) => {
@@ -174,42 +303,171 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
 
   return (
     <div className="bg-black border border-white/20 rounded-lg shadow-md p-6">
-      <div className="mb-4">
-        <SearchableDropdown
-          id="wing-filter"
-          options={wings}
-          value={wing}
-          onChange={setWing}
-          placeholder="Filter by wing"
-          label="Filter by Wing"
-        />
-      </div>
+      {activeTab !== 'total' && (
+        <div className="mb-4">
+          <SearchableDropdown
+            id="wing-filter"
+            options={wings}
+            value={wing}
+            onChange={setWing}
+            placeholder="Filter by wing"
+            label="Filter by Wing"
+          />
+        </div>
+      )}
 
-      <div className="flex border-b border-white/20 mb-6">
+      <div className="flex items-center justify-between border-b border-white/20 mb-6">
+        <div className="flex">
+          <button
+            onClick={() => setActiveTab('exercise')}
+            className={`px-6 py-3 font-semibold transition-colors ${
+              activeTab === 'exercise'
+                ? 'text-[#ff7301] border-b-2 border-[#ff7301]'
+                : 'text-white/70 hover:text-white'
+            }`}
+          >
+            Exercise-Based View
+          </button>
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-6 py-3 font-semibold transition-colors ${
+              activeTab === 'all'
+                ? 'text-[#ff7301] border-b-2 border-[#ff7301]'
+                : 'text-white/70 hover:text-white'
+            }`}
+          >
+            All Scores View
+          </button>
+          <button
+            onClick={() => setActiveTab('total')}
+            className={`px-6 py-3 font-semibold transition-colors ${
+              activeTab === 'total'
+                ? 'text-[#ff7301] border-b-2 border-[#ff7301]'
+                : 'text-white/70 hover:text-white'
+            }`}
+          >
+            Total Reps
+          </button>
+        </div>
         <button
-          onClick={() => setActiveTab('exercise')}
-          className={`px-6 py-3 font-semibold transition-colors ${
-            activeTab === 'exercise'
-              ? 'text-[#ff7301] border-b-2 border-[#ff7301]'
-              : 'text-white/70 hover:text-white'
-          }`}
+          onClick={handleExport}
+          className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+          title="Export to CSV"
         >
-          Exercise-Based View
-        </button>
-        <button
-          onClick={() => setActiveTab('all')}
-          className={`px-6 py-3 font-semibold transition-colors ${
-            activeTab === 'all'
-              ? 'text-[#ff7301] border-b-2 border-[#ff7301]'
-              : 'text-white/70 hover:text-white'
-          }`}
-        >
-          All Scores View
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className="w-5 h-5"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+            />
+          </svg>
         </button>
       </div>
 
       {loading ? (
         <p className="text-white/70">Loading...</p>
+      ) : activeTab === 'total' ? (
+        <>
+          <div className="mb-4">
+            <h2 className="text-2xl font-bold text-white mb-2">Total Reps Leaderboard</h2>
+            <p className="text-white/70 text-sm">Goal: 20260 reps to unlock the Medal (July 26)</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/20">
+                  <th className="text-left py-2 px-4 font-semibold text-white">Rank</th>
+                  <th className="text-left py-2 px-4 font-semibold text-white">Name</th>
+                  <th className="text-left py-2 px-4 font-semibold text-white">Wing</th>
+                  <th className="text-right py-2 px-4 font-semibold text-white">Total Reps</th>
+                  <th className="text-center py-2 px-4 font-semibold text-white">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {totalRepsData.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-white/70">
+                      No scores yet. Be the first!
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedTotalRepsData.map((entry) => (
+                    <tr
+                      key={entry.user_id}
+                      className={`border-b border-white/10 hover:bg-white/5 ${
+                        entry.achieved_goal ? 'bg-green-900/30' : ''
+                      }`}
+                    >
+                      <td className="py-3 px-4 text-white font-medium">
+                        #{entry.rank}
+                      </td>
+                      <td className={`py-3 px-4 font-medium ${
+                        entry.achieved_goal ? 'text-green-400 font-bold' : 'text-white'
+                      }`}>
+                        {entry.user_name}
+                        {entry.achieved_goal && (
+                          <span className="ml-2 text-green-400">✓</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-white/80">
+                        {entry.wing || '-'}
+                      </td>
+                      <td className={`py-3 px-4 text-right font-semibold ${
+                        entry.achieved_goal ? 'text-green-400' : 'text-[#ff7301]'
+                      }`}>
+                        {entry.total_reps.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {entry.achieved_goal ? (
+                          <span className="px-3 py-1 bg-green-600 text-white rounded-full text-sm font-semibold">
+                            Goal Achieved
+                          </span>
+                        ) : (
+                          <span className="text-white/50 text-sm">
+                            {GOAL_REPS - entry.total_reps} to go
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {totalPagesTotalReps > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/20">
+              <div className="text-white/70 text-sm">
+                Showing {startIndexTotalReps + 1} to {Math.min(endIndexTotalReps, totalRepsData.length)} of {totalRepsData.length} entries
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-white/70 text-sm">
+                  Page {currentPage} of {totalPagesTotalReps}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPagesTotalReps, prev + 1))}
+                  disabled={currentPage === totalPagesTotalReps}
+                  className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       ) : activeTab === 'exercise' ? (
         <>
           <div className="overflow-x-auto">
@@ -237,7 +495,10 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                       className="border-b border-white/10 hover:bg-white/5"
                     >
                       <td className="py-3 px-4 text-white font-medium">
-                        {entry.exercise_name}
+                        <div className="flex items-center gap-2">
+                          <ExerciseIcon exerciseName={entry.exercise_name} className="w-5 h-5 text-[#ff7301]" />
+                          {entry.exercise_name}
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-white">
                         {getDisplayName(entry)}
@@ -299,7 +560,8 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
               
               return (
                 <div key={exercise.id} className="bg-black border border-white/20 rounded-lg p-4">
-                  <h2 className="text-xl font-bold mb-4 text-white">
+                  <h2 className="text-xl font-bold mb-4 text-white flex items-center gap-2">
+                    <ExerciseIcon exerciseName={exercise.name} className="w-6 h-6 text-[#ff7301]" />
                     {exercise.name} Leaderboard
                   </h2>
                   {entries.length === 0 ? (

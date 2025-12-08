@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import ExerciseIcon from './ExerciseIcon';
 
 interface Exercise {
   id: number;
@@ -137,7 +138,7 @@ export default function ExerciseScoresForm({
         </div>
 
         <p className="text-white/70 mb-6 text-sm">
-          Enter your scores below. Leave exercises blank if you didn't complete them.
+          Enter your scores below. Leave exercises blank if you didn&apos;t complete them.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -149,8 +150,9 @@ export default function ExerciseScoresForm({
               <div key={exercise.id}>
                 <label 
                   htmlFor={`exercise-${exercise.id}`} 
-                  className="block text-sm font-medium text-white mb-1"
+                  className="flex items-center gap-2 text-sm font-medium text-white mb-1"
                 >
+                  <ExerciseIcon exerciseName={exercise.name} className="w-5 h-5 text-[#ff7301]" />
                   {exercise.name} ({inputLabel})
                 </label>
                 <input

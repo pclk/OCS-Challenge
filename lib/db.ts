@@ -621,3 +621,56 @@ export async function getAllLeaderboards(limit: number = 10, wing?: string | nul
   }, null, 2));
   return leaderboards;
 }
+
+// Get total reps leaderboard - sums best score per rep-type exercise per user across entire OCS
+export async function getTotalRepsLeaderboard() {
+  await ensureInitialized();
+  
+  // Use raw SQL to efficiently sum best reps per exercise per user
+  // Only count exercises with type 'rep', not 'seconds'
+  // For each user, get their best score per exercise, then sum those
+  const results = await prisma.$queryRaw<Array<{
+    user_id: number;
+    user_name: string;
+    wing: string | null;
+    total_reps: bigint;
+  }>>`
+    WITH best_scores_per_exercise AS (
+      SELECT 
+        s.user_id,
+        s.exercise_id,
+        MAX(s.value) as best_value
+      FROM scores s
+      INNER JOIN exercises e ON e.id = s.exercise_id AND e.type = 'rep'
+      GROUP BY s.user_id, s.exercise_id
+    )
+    SELECT 
+      u.id as user_id,
+      u.name as user_name,
+      u.wing,
+      COALESCE(SUM(bs.best_value), 0)::bigint as total_reps
+    FROM users u
+    LEFT JOIN best_scores_per_exercise bs ON bs.user_id = u.id
+    GROUP BY u.id, u.name, u.wing
+    HAVING COALESCE(SUM(bs.best_value), 0) > 0
+    ORDER BY total_reps DESC, u.name ASC
+  `;
+  
+  const leaderboard = results.map((row, index) => ({
+    rank: index + 1,
+    user_id: Number(row.user_id),
+    user_name: row.user_name,
+    wing: row.wing,
+    total_reps: Number(row.total_reps),
+    achieved_goal: Number(row.total_reps) >= 20260,
+  }));
+  
+  console.log('[DB] getTotalRepsLeaderboard - Retrieved total reps leaderboard:', JSON.stringify({
+    function: 'getTotalRepsLeaderboard',
+    parameters: {},
+    result: { count: leaderboard.length },
+    data: leaderboard.slice(0, 5)
+  }, null, 2));
+  
+  return leaderboard;
+}
