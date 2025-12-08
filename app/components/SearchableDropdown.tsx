@@ -12,6 +12,7 @@ interface SearchableDropdownProps {
   id?: string;
   onEnterPress?: () => void; // Callback when Enter is pressed and option is selected
   loading?: boolean; // Whether options are still loading
+  disabled?: boolean; // Whether the input is disabled
 }
 
 export default function SearchableDropdown({
@@ -24,6 +25,7 @@ export default function SearchableDropdown({
   id,
   onEnterPress,
   loading = false,
+  disabled = false,
 }: SearchableDropdownProps) {
   const [inputValue, setInputValue] = useState(value || '');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -206,7 +208,7 @@ export default function SearchableDropdown({
           placeholder={placeholder}
           required={required}
           autoComplete="off"
-          disabled={loading}
+          disabled={loading || disabled}
         />
         {loading && (
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">

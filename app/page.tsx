@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import toast from 'react-hot-toast';
-import WingSelection from './components/WingSelection';
-import NameSelectionByWing from './components/NameSelectionByWing';
+import { useAuth } from './components/AuthContext';
+import AuthForm from './components/AuthForm';
 import ExerciseScoresForm from './components/ExerciseScoresForm';
 import Leaderboard from './components/Leaderboard';
+import UserAccountModal from './components/UserAccountModal';
 
 interface Exercise {
   id: number;
@@ -15,16 +16,18 @@ interface Exercise {
 }
 
 export default function Home() {
+  const { user, loading, logout, token } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [wings, setWings] = useState<string[]>([]);
-  const [selectedWing, setSelectedWing] = useState<string | null>(null);
-  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [showAccountModal, setShowAccountModal] = useState(false);
 
   useEffect(() => {
-    fetchExercises();
-    fetchWings();
-  }, []);
+    if (user) {
+      fetchExercises();
+      fetchWings();
+    }
+  }, [user]);
 
   const fetchExercises = async () => {
     const loadingToast = toast.loading('Loading exercises...');
@@ -64,62 +67,79 @@ export default function Home() {
 
   const handleScoreSubmitted = () => {
     setRefreshKey((prev) => prev + 1);
-    // Reset to wing selection after successful submission
-    setSelectedWing(null);
-    setSelectedName(null);
   };
 
-  const handleWingSelected = (wing: string) => {
-    setSelectedWing(wing);
-  };
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-black py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-center">
+            <p className="text-white">Loading...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
-  const handleNameSelected = (name: string) => {
-    setSelectedName(name);
-  };
-
-  const handleBackFromName = () => {
-    setSelectedName(null);
-  };
-
-  const handleBackFromWing = () => {
-    setSelectedWing(null);
-  };
+  if (!user) {
+    return (
+      <main className="min-h-screen bg-black py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+            <Image
+              src="/ocs_safti_gold.jpg"
+              alt="OCS SAFTI Gold"
+              width={80}
+              height={80}
+              className="object-contain"
+            />
+            <h1 className="text-2xl sm:text-4xl font-bold text-white text-center sm:text-left">
+              Exercise Leaderboard
+            </h1>
+          </div>
+          <AuthForm />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-black py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-center gap-4 mb-8">
-          <Image
-            src="/ocs_safti_gold.jpg"
-            alt="OCS SAFTI Gold"
-            width={80}
-            height={80}
-            className="object-contain"
-          />
-          <h1 className="text-4xl font-bold text-white">
-            Exercise Leaderboard
-          </h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0 mb-8">
+          <div className="flex items-center justify-center gap-4">
+            <h1 className="text-2xl sm:text-4xl font-bold text-white">
+              Exercise Leaderboard
+            </h1>
+          </div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <span className="text-white/70 text-sm sm:text-base">
+              {user.name} {user.wing && `(${user.wing})`}
+            </span>
+            <button
+              onClick={() => setShowAccountModal(true)}
+              className="p-2 bg-black rounded-md hover:bg-[#ff7301]/20 hover:border-[#ff7301]/80 transition-colors self-start sm:self-auto"
+              title="Account Management"
+            >
+              <Image
+                src="/account_manage.png"
+                alt="Account Management"
+                width={50}
+                height={50}
+              />
+            </button>
+          </div>
         </div>
         <Leaderboard key={refreshKey} exercises={exercises} wings={wings} />
-        {selectedWing && selectedName ? (
-          <ExerciseScoresForm
-            name={selectedName}
-            wing={selectedWing}
-            exercises={exercises}
-            onScoreSubmitted={handleScoreSubmitted}
-            onBack={handleBackFromName}
-          />
-        ) : selectedWing ? (
-          <NameSelectionByWing
-            wing={selectedWing}
-            onNameSelected={handleNameSelected}
-            onBack={handleBackFromWing}
-          />
-        ) : (
-          <WingSelection onWingSelected={handleWingSelected} />
-        )}
+        <ExerciseScoresForm
+          exercises={exercises}
+          onScoreSubmitted={handleScoreSubmitted}
+        />
       </div>
+      <UserAccountModal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+      />
     </main>
   );
 }
-

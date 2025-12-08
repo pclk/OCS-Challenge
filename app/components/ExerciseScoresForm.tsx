@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { useAuth } from './AuthContext';
 import ExerciseIcon from './ExerciseIcon';
 
 interface Exercise {
@@ -12,24 +13,26 @@ interface Exercise {
 }
 
 interface ExerciseScoresFormProps {
-  name: string;
-  wing: string;
   exercises: Exercise[];
   onScoreSubmitted?: () => void;
-  onBack?: () => void;
 }
 
 export default function ExerciseScoresForm({ 
-  name,
-  wing,
   exercises, 
-  onScoreSubmitted,
-  onBack 
+  onScoreSubmitted
 }: ExerciseScoresFormProps) {
   const router = useRouter();
+  const { user, token } = useAuth();
   const [scores, setScores] = useState<Record<number, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  if (!user) {
+    return null;
+  }
+
+  const name = user.name;
+  const wing = user.wing || '';
 
   const handleScoreChange = (exerciseId: number, value: string) => {
     setScores(prev => ({
@@ -76,10 +79,9 @@ export default function ExerciseScoresForm({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
         },
         body: JSON.stringify({
-          name: name.trim(),
-          wing: wing.trim(),
           scores: validScores,
         }),
       });
@@ -118,23 +120,12 @@ export default function ExerciseScoresForm({
   return (
     <div className="bg-black border border-white/20 rounded-lg shadow-md mb-6">
       <div className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-2xl font-bold text-white">Enter Your Scores</h2>
-            <p className="text-white/70 mt-1">
-              Wing: <span className="text-[#ff7301] font-semibold">{wing}</span> | 
-              Name: <span className="text-[#ff7301] font-semibold">{name}</span>
-            </p>
-          </div>
-          {onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              className="text-white/70 hover:text-white transition-colors"
-            >
-              ← Change Name
-            </button>
-          )}
+        <div className="mb-4">
+          <h2 className="text-2xl font-bold text-white">Enter Your Scores</h2>
+          <p className="text-white/70 mt-1">
+            Wing: <span className="text-[#ff7301] font-semibold">{wing || 'N/A'}</span> | 
+            Name: <span className="text-[#ff7301] font-semibold">{name}</span>
+          </p>
         </div>
 
         <p className="text-white/70 mb-6 text-sm">
@@ -181,19 +172,10 @@ export default function ExerciseScoresForm({
           )}
 
           <div className="flex gap-4">
-            {onBack && (
-              <button
-                type="button"
-                onClick={onBack}
-                className="flex-1 bg-white/10 text-white py-2 px-4 rounded-md hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black transition-colors"
-              >
-                Back
-              </button>
-            )}
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`${onBack ? 'flex-1' : 'w-full'} bg-[#ff7301] text-white py-2 px-4 rounded-md hover:bg-[#ff7301]/90 focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:ring-offset-2 focus:ring-offset-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+              className="w-full bg-[#ff7301] text-white py-2 px-4 rounded-md hover:bg-[#ff7301]/90 focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:ring-offset-2 focus:ring-offset-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? 'Submitting...' : 'Submit Scores'}
             </button>

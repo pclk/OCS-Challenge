@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
+import { AuthProvider } from "./components/AuthContext";
 
 export const metadata: Metadata = {
   title: "Exercise Leaderboard",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Toaster
           position="top-right"
           toastOptions={{

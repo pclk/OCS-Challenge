@@ -35,12 +35,16 @@ model NameRankMapping {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  wing      String?
-  createdAt DateTime @default(now()) @map("created_at")
-  scores    Score[]
+  id             Int       @id @default(autoincrement())
+  name           String
+  wing           String?
+  password       String?
+  approved       Boolean   @default(false)
+  pendingApproval Boolean  @default(false) @map("pending_approval")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  scores         Score[]
 
+  @@unique([name, wing])
   @@map("users")
 }
 
@@ -56,6 +60,20 @@ model Score {
   @@index([exerciseId, value(sort: Desc)])
   @@index([userId])
   @@map("scores")
+}
+
+model AccountAction {
+  id        Int       @id @default(autoincrement())
+  userId    Int?      @map("user_id")
+  userName  String?   @map("user_name")
+  userWing  String?   @map("user_wing")
+  action    String
+  details   Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("account_actions")
 }
 
 enum ExerciseType {

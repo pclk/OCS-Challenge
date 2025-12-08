@@ -1,64 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrCreateUser, createScore, createScores, getExerciseById, getLeaderboard, getUserInfoByName } from '@/lib/db';
+import { createScore, createScores, getExerciseById, getLeaderboard, getUserById } from '@/lib/db';
+import { verifySessionToken, extractTokenFromHeader } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
     console.log('[API] POST /api/scores - Request received');
+    
+    // Verify authentication token
+    const authHeader = request.headers.get('authorization');
+    const token = extractTokenFromHeader(authHeader);
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const payload = verifySessionToken(token);
+    if (!payload) {
+      return NextResponse.json(
+        { error: 'Invalid or expired token' },
+        { status: 401 }
+      );
+    }
+
+    // Get user from database to ensure still exists and is approved
+    const user = await getUserById(payload.userId);
+    if (!user || (!user.approved && user.pendingApproval)) {
+      return NextResponse.json(
+        { error: 'User not found or not approved' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     console.log('[API] POST /api/scores - Request body:', JSON.stringify(body, null, 2));
     
-    // Support both single score and bulk scores
+    // Support bulk scores submission (authenticated users)
     if (body.scores && Array.isArray(body.scores)) {
-      // Bulk submission
-      const { name, scores } = body;
+      const { scores } = body;
       
       console.log('[API] POST /api/scores - Bulk submission detected:', {
-        name,
+        userId: user.id,
         scoresCount: scores?.length,
         scores: scores?.slice(0, 3) // Log first 3 for debugging
       });
       
-      if (!name || !scores || scores.length === 0) {
+      if (!scores || scores.length === 0) {
         console.log('[API] POST /api/scores - Missing required fields');
         return NextResponse.json(
-          { error: 'Missing required fields: name, scores' },
+          { error: 'Missing required fields: scores' },
           { status: 400 }
         );
       }
 
-      // Get wing from request body (required for bulk submission)
-      const { wing } = body;
-      
-      console.log('[API] POST /api/scores - Wing from request:', wing);
-      
-      if (!wing) {
-        console.log('[API] POST /api/scores - Missing wing field');
-        return NextResponse.json(
-          { error: 'Missing required field: wing' },
-          { status: 400 }
-        );
-      }
-
-      // Verify the name and wing combination exists
-      console.log('[API] POST /api/scores - Calling getUserInfoByName with name:', name);
-      const userInfo = await getUserInfoByName(name);
-      console.log('[API] POST /api/scores - getUserInfoByName result:', JSON.stringify(userInfo, null, 2));
-      if (!userInfo) {
-        return NextResponse.json(
-          { error: 'User not found. Please check your name.' },
-          { status: 404 }
-        );
-      }
-
-      // Verify the wing matches
-      if (userInfo.wing !== wing) {
-        return NextResponse.json(
-          { error: 'Name and wing combination not found. Please check your details.' },
-          { status: 404 }
-        );
-      }
-
-      const userId = await getOrCreateUser(name, wing);
+      const userId = user.id;
 
       // Validate and filter scores (only include exercises with values)
       const validScores = scores
@@ -123,13 +120,13 @@ export async function POST(request: NextRequest) {
         throw error; // Re-throw to be caught by outer catch
       }
     } else {
-      // Single score submission (backward compatibility - requires name and wing)
-      const { name, wing, exerciseId, value } = body;
+      // Single score submission (authenticated users)
+      const { exerciseId, value } = body;
 
       // Validate input
-      if (!name || !wing || !exerciseId || value === undefined || value === null) {
+      if (!exerciseId || value === undefined || value === null) {
         return NextResponse.json(
-          { error: 'Missing required fields: name, wing, exerciseId, value' },
+          { error: 'Missing required fields: exerciseId, value' },
           { status: 400 }
         );
       }
@@ -151,8 +148,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Get or create user
-      const userId = await getOrCreateUser(name, wing);
+      // Use authenticated user
+      const userId = user.id;
 
       // Create score
       await createScore(userId, exerciseId, numValue);
