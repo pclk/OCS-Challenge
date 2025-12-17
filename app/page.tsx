@@ -106,19 +106,19 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-black py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0 mb-8">
+        <div className="flex flex-row items-center justify-between gap-4 mb-8">
           <div className="flex items-center justify-center gap-4">
             <h1 className="text-2xl sm:text-4xl font-bold text-white">
               Exercise Leaderboard
             </h1>
           </div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+          <div className="flex flex-row items-center gap-3 sm:gap-4">
             <span className="text-white/70 text-sm sm:text-base">
               {user.name} {user.wing && `(${user.wing})`}
             </span>
             <button
               onClick={() => setShowAccountModal(true)}
-              className="p-2 bg-black rounded-md hover:bg-[#ff7301]/20 hover:border-[#ff7301]/80 transition-colors self-start sm:self-auto"
+              className="p-2 bg-black rounded-md hover:bg-[#ff7301]/20 hover:border-[#ff7301]/80 transition-colors"
               title="Account Management"
             >
               <Image
@@ -126,6 +126,7 @@ export default function Home() {
                 alt="Account Management"
                 width={50}
                 height={50}
+                className="w-8 h-8 sm:w-[50px] sm:h-[50px]"
               />
             </button>
           </div>

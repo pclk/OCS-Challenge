@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import SearchableDropdown from './SearchableDropdown';
 import ExerciseIcon from './ExerciseIcon';
+import { useAuth } from './AuthContext';
 
 interface LeaderboardEntry {
   id: number;
@@ -51,7 +52,8 @@ interface LeaderboardProps {
 }
 
 export default function Leaderboard({ exercises, wings: allWings }: LeaderboardProps) {
-  const [activeTab, setActiveTab] = useState<'exercise' | 'all' | 'total'>('exercise');
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'exercise' | 'all' | 'total'>('total');
   const [wing, setWing] = useState('OCS LEVEL');
   const [exerciseBasedData, setExerciseBasedData] = useState<ExerciseBasedEntry[]>([]);
   const [allData, setAllData] = useState<Record<string, LeaderboardEntry[]>>({});
@@ -63,6 +65,12 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   const GOAL_REPS = 20260;
   // Add OCS LEVEL at the beginning for the filter
   const wings = ['OCS LEVEL', ...allWings];
+
+  // Helper function to check if entry matches current user
+  const isUserEntry = useCallback((entryName: string, entryWing: string | null) => {
+    if (!user) return false;
+    return entryName === user.name && entryWing === user.wing;
+  }, [user]);
 
   // Deduplicate entries: keep only the highest rep count for each unique combination of name and wing
   const deduplicateEntries = useCallback((entries: LeaderboardEntry[]): LeaderboardEntry[] => {
@@ -177,28 +185,115 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     return entry.user_name;
   };
 
+  // Helper function to get rank color class
+  const getRankColorClass = (rank: number) => {
+    if (rank === 1) return 'text-yellow-400'; // Gold
+    if (rank === 2) return 'text-gray-300'; // Silver
+    if (rank === 3) return 'text-amber-600'; // Bronze
+    return 'text-white/70'; // Gray for rest
+  };
+
+  // Process Exercise-Based data: filter out entries without username, do NOT add placeholder
+  const processedExerciseBasedData = useMemo(() => {
+    // Filter out entries without user_name
+    const filteredData = exerciseBasedData.filter(entry => entry.user_name && entry.user_name.trim() !== '');
+    
+    // Do not add placeholder for exercise-based view
+    return filteredData;
+  }, [exerciseBasedData]);
+
+  // Process Total Reps data: add placeholder if user has no entry
+  const processedTotalRepsData = useMemo(() => {
+    if (!user || totalRepsData.length === 0) return totalRepsData;
+    
+    const hasUserEntry = totalRepsData.some(entry => 
+      isUserEntry(entry.user_name, entry.wing)
+    );
+    
+    if (!hasUserEntry) {
+      // Find the lowest rank to place placeholder
+      const maxRank = Math.max(...totalRepsData.map(e => e.rank || 0), 0);
+      const placeholder: TotalRepsEntry = {
+        rank: maxRank + 1,
+        user_id: user.id,
+        user_name: user.name,
+        wing: user.wing,
+        total_reps: 0,
+        achieved_goal: false,
+      };
+      return [...totalRepsData, placeholder];
+    }
+    
+    return totalRepsData;
+  }, [totalRepsData, user, isUserEntry]);
+
+  // Process All Data: add placeholder for each exercise if user has no entry
+  const processedAllData = useMemo(() => {
+    if (!user) return allData;
+    
+    const processed: Record<string, LeaderboardEntry[]> = {};
+    
+    exercises.forEach(exercise => {
+      const entries = allData[exercise.name] || [];
+      const hasUserEntry = entries.some(entry => 
+        isUserEntry(entry.user_name, entry.wing)
+      );
+      
+      if (!hasUserEntry && entries.length > 0) {
+        const placeholder: LeaderboardEntry = {
+          id: -1,
+          value: 0,
+          created_at: new Date().toISOString(),
+          user_name: user.name,
+          wing: user.wing,
+          user_id: user.id,
+        };
+        processed[exercise.name] = [...entries, placeholder];
+      } else {
+        processed[exercise.name] = entries;
+      }
+    });
+    
+    return processed;
+  }, [allData, user, exercises, isUserEntry]);
+
   // Pagination helpers for Exercise-Based View
-  const totalPagesExercise = Math.ceil(exerciseBasedData.length / itemsPerPage);
+  const totalPagesExercise = Math.ceil(processedExerciseBasedData.length / itemsPerPage);
   const startIndexExercise = (currentPage - 1) * itemsPerPage;
   const endIndexExercise = startIndexExercise + itemsPerPage;
-  const paginatedExerciseData = exerciseBasedData.slice(startIndexExercise, endIndexExercise);
+  const paginatedExerciseData = processedExerciseBasedData.slice(startIndexExercise, endIndexExercise);
 
   // Pagination helpers for Total Reps View
-  const totalPagesTotalReps = Math.ceil(totalRepsData.length / itemsPerPage);
+  const totalPagesTotalReps = Math.ceil(processedTotalRepsData.length / itemsPerPage);
   const startIndexTotalReps = (currentPage - 1) * itemsPerPage;
   const endIndexTotalReps = startIndexTotalReps + itemsPerPage;
-  const paginatedTotalRepsData = totalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
+  const paginatedTotalRepsData = processedTotalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
 
   // Export to CSV functions for different tabs
   const exportTotalRepsToCSV = () => {
-    const headers = ['Rank', 'Name', 'Wing', 'Total Reps', 'Achieved Goal (20260)'];
-    const rows = totalRepsData.map(entry => [
-      entry.rank,
-      entry.user_name,
-      entry.wing || '-',
-      entry.total_reps,
-      entry.achieved_goal ? 'Yes' : 'No'
-    ]);
+    const headers = ['Rank', 'Name', 'Wing', 'Total Reps', 'Status (%)'];
+    const rows = processedTotalRepsData.map(entry => {
+      const isUser = isUserEntry(entry.user_name, entry.wing);
+      const isPlaceholder = entry.total_reps === 0 && isUser && entry.user_id === user?.id;
+      const percentage = Math.min(Math.round((entry.total_reps / GOAL_REPS) * 100), 100);
+      
+      let status = '';
+      if (isPlaceholder) {
+        status = 'You haven\'t done any reps yet!';
+      } else if (entry.achieved_goal) {
+        status = `Goal Achieved (${percentage}%)`;
+      } else {
+        status = `${percentage}%`;
+      }
+      
+      return [
+        entry.rank,
+        entry.user_name,
+        entry.wing || '-',
+        entry.total_reps,
+        status
+      ];
+    });
     
     const csvContent = [
       headers.join(','),
@@ -219,7 +314,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
 
   const exportExerciseBasedToCSV = () => {
     const headers = ['Exercise', 'Name', 'Wing', 'Reps', 'Date'];
-    const rows = exerciseBasedData.map(entry => [
+    const rows = processedExerciseBasedData.map(entry => [
       entry.exercise_name,
       entry.user_name,
       entry.wing || '-',
@@ -249,7 +344,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     const headers = ['Exercise', 'Name', 'Wing', 'Reps', 'Date'];
     
     exercises.forEach(exercise => {
-      const entries = allData[exercise.name] || [];
+      const entries = processedAllData[exercise.name] || [];
       entries.forEach(entry => {
         allRows.push([
           exercise.name,
@@ -316,18 +411,18 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/20 mb-6 gap-4">
-        <div className="overflow-x-auto w-full sm:w-auto -mx-6 px-6 sm:mx-0 sm:px-0">
+      <div className="flex flex-row items-center justify-between border-b border-white/20 mb-6 gap-4">
+        <div className="overflow-x-auto flex-1 min-w-0 custom-scrollbar">
           <div className="flex flex-nowrap sm:flex-wrap">
             <button
-              onClick={() => setActiveTab('exercise')}
+              onClick={() => setActiveTab('total')}
               className={`px-4 sm:px-6 py-3 font-semibold transition-colors whitespace-nowrap ${
-                activeTab === 'exercise'
+                activeTab === 'total'
                   ? 'text-[#ff7301] border-b-2 border-[#ff7301]'
                   : 'text-white/70 hover:text-white'
               }`}
             >
-              Exercise-Based View
+              OCS 60 PT Challenge
             </button>
             <button
               onClick={() => setActiveTab('all')}
@@ -340,20 +435,20 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
               All Scores View
             </button>
             <button
-              onClick={() => setActiveTab('total')}
+              onClick={() => setActiveTab('exercise')}
               className={`px-4 sm:px-6 py-3 font-semibold transition-colors whitespace-nowrap ${
-                activeTab === 'total'
+                activeTab === 'exercise'
                   ? 'text-[#ff7301] border-b-2 border-[#ff7301]'
                   : 'text-white/70 hover:text-white'
               }`}
             >
-              Total Reps
+              Exercise-Based View
             </button>
           </div>
         </div>
         <button
           onClick={handleExport}
-          className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-md transition-colors self-start sm:self-auto"
+          className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-md transition-colors flex-shrink-0"
           title="Export to CSV"
         >
           <svg
@@ -389,17 +484,24 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
             <>
               {/* Mobile Card View */}
               <div className="block sm:hidden space-y-3">
-                {paginatedTotalRepsData.map((entry) => (
+                {paginatedTotalRepsData.map((entry) => {
+                  const isUser = isUserEntry(entry.user_name, entry.wing);
+                  const isPlaceholder = entry.total_reps === 0 && isUser && entry.user_id === user?.id;
+                  return (
                   <div
                     key={entry.user_id}
-                    className={`border border-white/20 rounded-lg p-4 ${
-                      entry.achieved_goal ? 'bg-green-900/30 border-green-600/50' : 'bg-black'
+                    className={`rounded-lg p-4 ${
+                      isUser 
+                        ? 'bg-gray-800 border border-[#ff7301]' 
+                        : entry.achieved_goal 
+                          ? 'bg-green-900/30 border border-green-600/50' 
+                          : 'border border-white/20 bg-black'
                     }`}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-white/70 text-sm">#{entry.rank}</span>
+                          <span className={`text-sm ${getRankColorClass(entry.rank || 0)}`}>#{entry.rank}</span>
                           <span className={`font-medium ${
                             entry.achieved_goal ? 'text-green-400 font-bold' : 'text-white'
                           }`}>
@@ -420,22 +522,63 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-white/10">
-                      {entry.achieved_goal ? (
+                      {isPlaceholder ? (
+                        <span className="text-white/50 text-xs">
+                          You haven't done any reps yet!
+                        </span>
+                      ) : entry.achieved_goal ? (
                         <span className="px-3 py-1 bg-green-600 text-white rounded-full text-xs font-semibold">
                           Goal Achieved
                         </span>
                       ) : (
-                        <span className="text-white/50 text-xs">
-                          {GOAL_REPS - entry.total_reps} to go
+                        <span className="text-white/60 text-xs">
+                          {Math.min(Math.round((entry.total_reps / GOAL_REPS) * 100), 100)}%
                         </span>
                       )}
                     </div>
+                    {/* Progress Bar */}
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-white/60 text-xs">Progress</span>
+                        <span className="text-white/60 text-xs">
+                          {Math.min(Math.round((entry.total_reps / GOAL_REPS) * 100), 100)}%
+                        </span>
+                      </div>
+                      <div className="relative w-full bg-white/10 rounded-full h-2 overflow-visible">
+                        {/* Milestone markers */}
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="absolute left-[25%] w-px h-2 bg-white/30" />
+                          <div className="absolute left-[50%] w-px h-2 bg-white/30" />
+                          <div className="absolute left-[75%] w-px h-2 bg-white/30" />
+                          <div className="absolute right-0 w-px h-2 bg-white/50" />
+                        </div>
+                        {/* Progress fill */}
+                        <div
+                          className={`h-full rounded-full transition-all relative z-10 ${
+                            entry.achieved_goal 
+                              ? 'bg-green-500' 
+                              : 'bg-[#ff7301]'
+                          }`}
+                          style={{
+                            width: `${Math.min((entry.total_reps / GOAL_REPS) * 100, 100)}%`
+                          }}
+                        />
+                      </div>
+                      {/* Milestone labels */}
+                      <div className="flex justify-between mt-1">
+                        <span className="text-white/40 text-[10px]">25%</span>
+                        <span className="text-white/40 text-[10px]">50%</span>
+                        <span className="text-white/40 text-[10px]">75%</span>
+                        <span className="text-white/50 text-[10px] font-semibold">Goal</span>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               {/* Desktop Table View */}
               <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full border-separate border-spacing-0">
                   <thead>
                     <tr className="border-b border-white/20">
                       <th className="text-left py-2 px-4 font-semibold text-white">Rank</th>
@@ -446,45 +589,112 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedTotalRepsData.map((entry) => (
-                      <tr
-                        key={entry.user_id}
-                        className={`border-b border-white/10 hover:bg-white/5 ${
-                          entry.achieved_goal ? 'bg-green-900/30' : ''
-                        }`}
-                      >
-                        <td className="py-3 px-4 text-white font-medium">
-                          #{entry.rank}
-                        </td>
-                        <td className={`py-3 px-4 font-medium ${
-                          entry.achieved_goal ? 'text-green-400 font-bold' : 'text-white'
-                        }`}>
-                          {entry.user_name}
-                          {entry.achieved_goal && (
-                            <span className="ml-2 text-green-400">✓</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-white/80">
-                          {entry.wing || '-'}
-                        </td>
-                        <td className={`py-3 px-4 text-right font-semibold ${
-                          entry.achieved_goal ? 'text-green-400' : 'text-[#ff7301]'
-                        }`}>
-                          {entry.total_reps.toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {entry.achieved_goal ? (
-                            <span className="px-3 py-1 bg-green-600 text-white rounded-full text-sm font-semibold">
-                              Goal Achieved
-                            </span>
-                          ) : (
-                            <span className="text-white/50 text-sm">
-                              {GOAL_REPS - entry.total_reps} to go
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {paginatedTotalRepsData.map((entry, index) => {
+                      const isUser = isUserEntry(entry.user_name, entry.wing);
+                      const isPlaceholder = entry.total_reps === 0 && isUser && entry.user_id === user?.id;
+                      const isPreviousEntryUser = index > 0 && isUserEntry(paginatedTotalRepsData[index - 1].user_name, paginatedTotalRepsData[index - 1].wing);
+                      return (
+                      <React.Fragment key={entry.user_id}>
+                        <tr
+                          className={`${
+                            isUser 
+                              ? 'bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301]' 
+                              : entry.achieved_goal 
+                                ? 'bg-green-900/30 border-b border-white/10' 
+                                : 'border-b border-white/10 hover:bg-white/5'
+                          }`}
+                        >
+                          <td className={`py-3 px-4 font-medium ${getRankColorClass(entry.rank || 0)}`}>
+                            #{entry.rank}
+                          </td>
+                          <td className={`py-3 px-4 font-medium ${
+                            entry.achieved_goal ? 'text-green-400 font-bold' : 'text-white'
+                          }`}>
+                            {entry.user_name}
+                            {entry.achieved_goal && (
+                              <span className="ml-2 text-green-400">✓</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-white/80">
+                            {entry.wing || '-'}
+                          </td>
+                          <td className={`py-3 px-4 text-right font-semibold ${
+                            entry.achieved_goal ? 'text-green-400' : 'text-[#ff7301]'
+                          }`}>
+                            {entry.total_reps.toLocaleString()}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {isPlaceholder ? (
+                              <span className="text-white/50 text-sm">
+                                You haven't done any reps yet!
+                              </span>
+                            ) : entry.achieved_goal ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="px-3 py-1 bg-green-600 text-white rounded-full text-sm font-semibold">
+                                  Goal Achieved
+                                </span>
+                                <span className="text-white/60 text-xs">
+                                  {Math.min(Math.round((entry.total_reps / GOAL_REPS) * 100), 100)}%
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-white/60 text-sm">
+                                {Math.min(Math.round((entry.total_reps / GOAL_REPS) * 100), 100)}%
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                        {/* Progress Bar Row */}
+                        <tr
+                          className={`${
+                            isUser 
+                              ? 'bg-gray-800 [&>td]:border-l [&>td]:border-r [&>td]:border-b [&>td]:border-[#ff7301]' 
+                              : entry.achieved_goal 
+                                ? 'bg-green-900/30 border-b border-white/10' 
+                                : 'border-b border-white/10'
+                          }`}
+                        >
+                          <td colSpan={5} className="py-3 px-4">
+                            <div className="mt-2">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-white/60 text-xs">Progress</span>
+                                <span className="text-white/60 text-xs">
+                                  {Math.min(Math.round((entry.total_reps / GOAL_REPS) * 100), 100)}%
+                                </span>
+                              </div>
+                              <div className="relative w-full bg-white/10 rounded-full h-2 overflow-visible">
+                                {/* Milestone markers */}
+                                <div className="absolute inset-0 flex items-center">
+                                  <div className="absolute left-[25%] w-px h-2 bg-white/30" />
+                                  <div className="absolute left-[50%] w-px h-2 bg-white/30" />
+                                  <div className="absolute left-[75%] w-px h-2 bg-white/30" />
+                                  <div className="absolute right-0 w-px h-2 bg-white/50" />
+                                </div>
+                                {/* Progress fill */}
+                                <div
+                                  className={`h-full rounded-full transition-all relative z-10 ${
+                                    entry.achieved_goal 
+                                      ? 'bg-green-500' 
+                                      : 'bg-[#ff7301]'
+                                  }`}
+                                  style={{
+                                    width: `${Math.min((entry.total_reps / GOAL_REPS) * 100, 100)}%`
+                                  }}
+                                />
+                              </div>
+                              {/* Milestone labels */}
+                              <div className="flex justify-between mt-1">
+                                <span className="text-white/40 text-[10px]">25%</span>
+                                <span className="text-white/40 text-[10px]">50%</span>
+                                <span className="text-white/40 text-[10px]">75%</span>
+                                <span className="text-white/50 text-[10px] font-semibold">Goal</span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -493,7 +703,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
           {totalPagesTotalReps > 1 && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mt-4 pt-4 border-t border-white/20">
               <div className="text-white/70 text-sm">
-                Showing {startIndexTotalReps + 1} to {Math.min(endIndexTotalReps, totalRepsData.length)} of {totalRepsData.length} entries
+                Showing {startIndexTotalReps + 1} to {Math.min(endIndexTotalReps, processedTotalRepsData.length)} of {processedTotalRepsData.length} entries
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -527,10 +737,17 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
             <>
               {/* Mobile Card View */}
               <div className="block sm:hidden space-y-3">
-                {paginatedExerciseData.map((entry) => (
+                {paginatedExerciseData.map((entry) => {
+                  const isUser = isUserEntry(entry.user_name, entry.wing);
+                  const isPlaceholder = entry.exercise_id === -1;
+                  return (
                   <div
                     key={entry.exercise_id}
-                    className="border border-white/20 rounded-lg p-4 bg-black hover:bg-white/5 transition-colors"
+                    className={`rounded-lg p-4 transition-colors flex flex-col ${
+                      isUser 
+                        ? 'bg-gray-800 border border-[#ff7301]' 
+                        : 'border border-white/20 bg-black hover:bg-white/5'
+                    }`}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
@@ -543,21 +760,20 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                         <div className="text-white text-sm mb-1">
                           {getDisplayName(entry)}
                         </div>
-                        <div className="text-white/80 text-xs">
-                          {entry.wing || '-'}
-                        </div>
                       </div>
                       <div className="text-[#ff7301] text-right font-semibold text-lg">
                         {entry.value}
                       </div>
                     </div>
-                    <div className="mt-3 pt-3 border-t border-white/10">
-                      <div className="text-white/70 text-xs">
-                        {formatDate(entry.created_at)}
-                      </div>
+                    <div className="flex items-center justify-between text-white/80 text-xs mt-auto">
+                      <span>{entry.wing || '-'}</span>
+                      <span className="text-white/70 text-right">
+                        {isPlaceholder ? "You haven't done any reps yet!" : formatDate(entry.created_at)}
+                      </span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               {/* Desktop Table View */}
               <div className="hidden sm:block overflow-x-auto">
@@ -572,10 +788,17 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedExerciseData.map((entry) => (
+                    {paginatedExerciseData.map((entry) => {
+                      const isUser = isUserEntry(entry.user_name, entry.wing);
+                      const isPlaceholder = entry.exercise_id === -1;
+                      return (
                       <tr
                         key={entry.exercise_id}
-                        className="border-b border-white/10 hover:bg-white/5"
+                        className={`border-b ${
+                          isUser 
+                            ? 'bg-gray-800 border-[#ff7301]' 
+                            : 'border-white/10 hover:bg-white/5'
+                        }`}
                       >
                         <td className="py-3 px-4 text-white font-medium">
                           <div className="flex items-center gap-2">
@@ -593,10 +816,11 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                           {entry.value}
                         </td>
                         <td className="py-3 px-4 text-white/70 text-right text-sm">
-                          {formatDate(entry.created_at)}
+                          {isPlaceholder ? "You haven't done any reps yet!" : formatDate(entry.created_at)}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -605,7 +829,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
           {totalPagesExercise > 1 && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mt-4 pt-4 border-t border-white/20">
               <div className="text-white/70 text-sm">
-                Showing {startIndexExercise + 1} to {Math.min(endIndexExercise, exerciseBasedData.length)} of {exerciseBasedData.length} entries
+                Showing {startIndexExercise + 1} to {Math.min(endIndexExercise, processedExerciseBasedData.length)} of {processedExerciseBasedData.length} entries
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -635,7 +859,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
             <p className="text-white/70">No exercises available.</p>
           ) : (
             exercises.map((exercise) => {
-              const entries = allData[exercise.name] || [];
+              const entries = processedAllData[exercise.name] || [];
               const paginatedEntries = getPaginatedEntries(entries, exercise.name);
               const totalPages = getTotalPages(entries);
               const currentExercisePage = getExercisePage(exercise.name);
@@ -654,34 +878,40 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     <>
                       {/* Mobile Card View */}
                       <div className="block sm:hidden space-y-3">
-                        {paginatedEntries.map((entry, index) => (
+                        {paginatedEntries.map((entry, index) => {
+                          const isUser = isUserEntry(entry.user_name, entry.wing);
+                          const isPlaceholder = entry.id === -1;
+                          return (
                           <div
                             key={entry.id}
-                            className="border border-white/20 rounded-lg p-4 bg-black hover:bg-white/5 transition-colors"
+                            className={`rounded-lg p-4 transition-colors flex flex-col ${
+                              isUser 
+                                ? 'bg-gray-800 border border-[#ff7301]' 
+                                : 'border border-white/20 bg-black hover:bg-white/5'
+                            }`}
                           >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-white/70 text-xs">#{startIndex + index + 1}</span>
+                                  <span className={`text-xs ${getRankColorClass(startIndex + index + 1)}`}>#{startIndex + index + 1}</span>
                                   <span className="text-white text-sm font-medium">
                                     {getDisplayName(entry)}
                                   </span>
-                                </div>
-                                <div className="text-white/80 text-xs">
-                                  {entry.wing || '-'}
                                 </div>
                               </div>
                               <div className="text-[#ff7301] text-right font-semibold text-lg">
                                 {entry.value}
                               </div>
                             </div>
-                            <div className="mt-3 pt-3 border-t border-white/10">
-                              <div className="text-white/70 text-xs">
-                                {formatDate(entry.created_at)}
-                              </div>
+                            <div className="flex items-center justify-between text-white/80 text-xs mt-auto">
+                              <span>{entry.wing || '-'}</span>
+                              <span className="text-white/70 text-right">
+                                {isPlaceholder ? "You haven't done any reps yet!" : formatDate(entry.created_at)}
+                              </span>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       {/* Desktop Table View */}
                       <div className="hidden sm:block overflow-x-auto">
@@ -697,12 +927,19 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                             </tr>
                           </thead>
                           <tbody>
-                            {paginatedEntries.map((entry, index) => (
+                            {paginatedEntries.map((entry, index) => {
+                              const isUser = isUserEntry(entry.user_name, entry.wing);
+                              const isPlaceholder = entry.id === -1;
+                              return (
                               <tr
                                 key={entry.id}
-                                className="border-b border-white/10 hover:bg-white/5"
+                                className={`border-b ${
+                                  isUser 
+                                    ? 'bg-gray-800 border-[#ff7301]' 
+                                    : 'border-white/10 hover:bg-white/5'
+                                }`}
                               >
-                                <td className="py-3 px-4 text-white font-medium">
+                                <td className={`py-3 px-4 font-medium ${getRankColorClass(startIndex + index + 1)}`}>
                                   #{startIndex + index + 1}
                                 </td>
                                 <td className="py-3 px-4 text-white">
@@ -715,10 +952,11 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                                   {entry.value}
                                 </td>
                                 <td className="py-3 px-4 text-white/70 text-right text-sm">
-                                  {formatDate(entry.created_at)}
+                                  {isPlaceholder ? "You haven't done any reps yet!" : formatDate(entry.created_at)}
                                 </td>
                               </tr>
-                            ))}
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
