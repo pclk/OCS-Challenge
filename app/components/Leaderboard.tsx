@@ -63,7 +63,9 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   const [currentPage, setCurrentPage] = useState(1);
   const [exercisePages, setExercisePages] = useState<Record<string, number>>({});
   const [timelineModal, setTimelineModal] = useState<{ userId: number; userName: string; userWing: string | null } | null>(null);
+  const [totalRepsSearch, setTotalRepsSearch] = useState('');
   const itemsPerPage = 10;
+  const itemsPerPageTotal = 5; // Separate page size for total reps view
   const GOAL_REPS = 20260;
   // Add OCS LEVEL at the beginning for the filter
   const wings = ['OCS LEVEL', ...allWings];
@@ -179,7 +181,9 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
 
   useEffect(() => {
     fetchData();
-    setCurrentPage(1); // Reset to first page when data changes
+    if (activeTab !== 'total') {
+      setCurrentPage(1); // Reset to first page when data changes (except for total view which has its own search)
+    }
     setExercisePages({}); // Reset exercise pages
   }, [fetchData]);
 
@@ -204,30 +208,42 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     return filteredData;
   }, [exerciseBasedData]);
 
-  // Process Total Reps data: add placeholder if user has no entry
+  // Process Total Reps data: add placeholder if user has no entry, then filter by search
   const processedTotalRepsData = useMemo(() => {
-    if (!user || totalRepsData.length === 0) return totalRepsData;
+    let data = totalRepsData;
     
-    const hasUserEntry = totalRepsData.some(entry => 
-      isUserEntry(entry.user_name, entry.wing)
-    );
-    
-    if (!hasUserEntry) {
-      // Find the lowest rank to place placeholder
-      const maxRank = Math.max(...totalRepsData.map(e => e.rank || 0), 0);
-      const placeholder: TotalRepsEntry = {
-        rank: maxRank + 1,
-        user_id: user.id,
-        user_name: user.name,
-        wing: user.wing,
-        total_reps: 0,
-        achieved_goal: false,
-      };
-      return [...totalRepsData, placeholder];
+    // Add placeholder if user has no entry
+    if (user && totalRepsData.length > 0) {
+      const hasUserEntry = totalRepsData.some(entry => 
+        isUserEntry(entry.user_name, entry.wing)
+      );
+      
+      if (!hasUserEntry) {
+        // Find the lowest rank to place placeholder
+        const maxRank = Math.max(...totalRepsData.map(e => e.rank || 0), 0);
+        const placeholder: TotalRepsEntry = {
+          rank: maxRank + 1,
+          user_id: user.id,
+          user_name: user.name,
+          wing: user.wing,
+          total_reps: 0,
+          achieved_goal: false,
+        };
+        data = [...totalRepsData, placeholder];
+      }
     }
     
-    return totalRepsData;
-  }, [totalRepsData, user, isUserEntry]);
+    // Filter by search query if provided
+    if (totalRepsSearch.trim()) {
+      const searchLower = totalRepsSearch.toLowerCase().trim();
+      data = data.filter(entry => 
+        entry.user_name.toLowerCase().includes(searchLower) ||
+        (entry.wing && entry.wing.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    return data;
+  }, [totalRepsData, user, isUserEntry, totalRepsSearch]);
 
   // Process All Data: add placeholder for each exercise if user has no entry
   const processedAllData = useMemo(() => {
@@ -266,9 +282,9 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   const paginatedExerciseData = processedExerciseBasedData.slice(startIndexExercise, endIndexExercise);
 
   // Pagination helpers for Total Reps View
-  const totalPagesTotalReps = Math.ceil(processedTotalRepsData.length / itemsPerPage);
-  const startIndexTotalReps = (currentPage - 1) * itemsPerPage;
-  const endIndexTotalReps = startIndexTotalReps + itemsPerPage;
+  const totalPagesTotalReps = Math.ceil(processedTotalRepsData.length / itemsPerPageTotal);
+  const startIndexTotalReps = (currentPage - 1) * itemsPerPageTotal;
+  const endIndexTotalReps = startIndexTotalReps + itemsPerPageTotal;
   const paginatedTotalRepsData = processedTotalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
 
   // Export to CSV functions for different tabs
@@ -478,6 +494,18 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
             <h2 className="text-2xl font-bold text-white mb-2">Total Reps Leaderboard</h2>
             <p className="text-white/70 text-sm">Goal: 20260 reps to unlock the Medal (July 26)</p>
           </div>
+          <div className="mb-4">
+            <input
+              type="text"
+              value={totalRepsSearch}
+              onChange={(e) => {
+                setTotalRepsSearch(e.target.value);
+                setCurrentPage(1); // Reset to first page when search changes
+              }}
+              placeholder="Search by name or wing..."
+              className="w-full px-4 py-2 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white placeholder-white/50"
+            />
+          </div>
           {totalRepsData.length === 0 ? (
             <div className="py-8 text-center text-white/70">
               No scores yet. Be the first!
@@ -485,7 +513,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
           ) : (
             <>
               {/* Mobile Card View */}
-              <div className="block sm:hidden space-y-3">
+              <div className="block sm:hidden space-y-3 max-h-[400px] overflow-y-auto pr-2">
                 {paginatedTotalRepsData.map((entry) => {
                   const isUser = isUserEntry(entry.user_name, entry.wing);
                   const isPlaceholder = entry.total_reps === 0 && isUser && entry.user_id === user?.id;
@@ -582,9 +610,9 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                 })}
               </div>
               {/* Desktop Table View */}
-              <div className="hidden sm:block overflow-x-auto">
+              <div className="hidden sm:block overflow-x-auto max-h-[400px] overflow-y-auto">
                 <table className="w-full border-separate border-spacing-0">
-                  <thead>
+                  <thead className="sticky top-0 bg-black z-10">
                     <tr className="border-b border-white/20">
                       <th className="text-left py-2 px-4 font-semibold text-white">Rank</th>
                       <th className="text-left py-2 px-4 font-semibold text-white">Name</th>
@@ -710,30 +738,32 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
               </div>
             </>
           )}
-          {totalPagesTotalReps > 1 && (
+          {processedTotalRepsData.length > 0 && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mt-4 pt-4 border-t border-white/20">
               <div className="text-white/70 text-sm">
                 Showing {startIndexTotalReps + 1} to {Math.min(endIndexTotalReps, processedTotalRepsData.length)} of {processedTotalRepsData.length} entries
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-white/70 text-sm">
-                  Page {currentPage} of {totalPagesTotalReps}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPagesTotalReps, prev + 1))}
-                  disabled={currentPage === totalPagesTotalReps}
-                  className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
-                >
-                  Next
-                </button>
-              </div>
+              {totalPagesTotalReps > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-white/70 text-sm">
+                    Page {currentPage} of {totalPagesTotalReps}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPagesTotalReps, prev + 1))}
+                    disabled={currentPage === totalPagesTotalReps}
+                    className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </>

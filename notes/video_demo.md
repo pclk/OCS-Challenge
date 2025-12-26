@@ -1,4 +1,4 @@
-Prep: Delete user Siew Wei Heng
+Prep: Delete user Siew Wei Heng, Delete exercise Jumping Jacks
 
 Welcome to the video demonstration for OCS PT Challenge.
 
@@ -127,8 +127,9 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 
 ### Pre-Recording Setup
 - [ ] **Delete user**: Siew Wei Heng, JEFF BEZOS, ELON MUSK, LEE CHONG WEI
-- [ ] **Logout** from admin panel (if logged in)
-- [ ] Delete the sheets.google.csv fields
+- [ ] **Delete exercise**: Jumping Jacks
+- [ ] **Logout** from admin panel
+- [ ] Delete the sheets.google.csv fields and zoom in 240%
 
 ---
 
