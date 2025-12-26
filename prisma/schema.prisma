@@ -41,6 +41,7 @@ model User {
   password       String?
   approved       Boolean   @default(false)
   pendingApproval Boolean  @default(false) @map("pending_approval")
+  hasLoggedIn    Boolean   @default(false) @map("has_logged_in")
   createdAt      DateTime  @default(now()) @map("created_at")
   scores         Score[]
 

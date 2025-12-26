@@ -17,6 +17,7 @@ interface User {
   wing: string | null;
   approved: boolean;
   pendingApproval: boolean;
+  hasLoggedIn?: boolean;
   createdAt: string | Date;
 }
 
@@ -805,11 +806,18 @@ export default function AdminPanel() {
                     <p className="text-white font-semibold">{user.name}</p>
                     <p className="text-white/70 text-sm">Wing: {user.wing || 'N/A'}</p>
                     <p className="text-white/50 text-xs">Created: {new Date(user.createdAt).toLocaleString()}</p>
-                    <span className={`text-xs px-2 py-1 rounded mt-2 inline-block ${
-                      user.approved ? 'bg-green-600/20 text-green-400' : 'bg-yellow-600/20 text-yellow-400'
-                    }`}>
-                      {user.approved ? 'Approved' : user.pendingApproval ? 'Pending' : 'Not Approved'}
-                    </span>
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      <span className={`text-xs px-2 py-1 rounded inline-block ${
+                        user.approved ? 'bg-green-600/20 text-green-400' : 'bg-yellow-600/20 text-yellow-400'
+                      }`}>
+                        {user.approved ? 'Approved' : user.pendingApproval ? 'Pending' : 'Not Approved'}
+                      </span>
+                      <span className={`text-xs px-2 py-1 rounded inline-block ${
+                        user.hasLoggedIn ? 'bg-blue-600/20 text-blue-400' : 'bg-gray-600/20 text-gray-400'
+                      }`}>
+                        {user.hasLoggedIn ? 'Logged In' : 'Not Logged In'}
+                      </span>
+                    </div>
                   </div>
                   {(adminLevel === 'OCS' || adminLevel === 'WING') && (
                     <div className="flex gap-2">

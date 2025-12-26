@@ -32,6 +32,17 @@ export async function initDatabase() {
   const startTime = Date.now();
 
   try {
+    // Ensure has_logged_in column exists (migration support)
+    try {
+      await prisma.$executeRaw`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS has_logged_in BOOLEAN NOT NULL DEFAULT false;
+      `;
+      console.log('[DB] initDatabase - Ensured has_logged_in column exists');
+    } catch (error: any) {
+      // Column might already exist, ignore error
+      console.log('[DB] initDatabase - has_logged_in column check:', error.message);
+    }
+
     // Check if data already exists
     const existingWingsCount = await prisma.wing.count();
     const existingExercisesCount = await prisma.exercise.count();
@@ -325,7 +336,7 @@ export async function registerUser(
       pending_approval: boolean;
     }>>`
       UPDATE users
-      SET password = ${hashedPassword}, approved = true, pending_approval = false
+      SET password = ${hashedPassword}, approved = true, pending_approval = false, has_logged_in = true
       WHERE id = ${userId}
       RETURNING id, name, wing, approved, pending_approval
     `;
@@ -349,8 +360,8 @@ export async function registerUser(
     approved: boolean;
     pending_approval: boolean;
   }>>`
-    INSERT INTO users (name, wing, password, approved, pending_approval, created_at)
-    VALUES (${name}, ${wing}, ${hashedPassword}, true, false, NOW())
+    INSERT INTO users (name, wing, password, approved, pending_approval, has_logged_in, created_at)
+    VALUES (${name}, ${wing}, ${hashedPassword}, true, false, true, NOW())
     RETURNING id, name, wing, approved, pending_approval
   `;
 
@@ -505,6 +516,13 @@ export async function authenticateUser(
     return null;
   }
 
+  // Mark user as having logged in
+  await prisma.$executeRaw`
+    UPDATE users
+    SET has_logged_in = true
+    WHERE id = ${user.id}
+  `;
+
   return {
     id: user.id,
     name: user.name,
@@ -650,9 +668,10 @@ export async function getUsersPaginated(
     wing: string | null;
     approved: boolean;
     pending_approval: boolean;
+    has_logged_in: boolean;
     created_at: Date;
   }>>(`
-    SELECT id, name, wing, approved, pending_approval, created_at
+    SELECT id, name, wing, approved, pending_approval, has_logged_in, created_at
     FROM users
     ${whereClause}
     ORDER BY created_at DESC
@@ -674,6 +693,7 @@ export async function getUsersPaginated(
       wing: user.wing,
       approved: user.approved,
       pendingApproval: user.pending_approval,
+      hasLoggedIn: user.has_logged_in,
       createdAt: user.created_at,
     })),
     pagination: {
@@ -798,6 +818,26 @@ export async function bulkUpsertUsers(users: Array<{ name: string; wing: string 
             throw createError;
           }
         }
+      }
+      
+      // Also upsert to NameRankMapping so names appear in registration/login
+      try {
+        await prisma.nameRankMapping.upsert({
+          where: {
+            name_wing: {
+              name: user.name,
+              wing: user.wing,
+            },
+          },
+          update: {},
+          create: {
+            name: user.name,
+            wing: user.wing,
+          },
+        });
+      } catch (mappingError: any) {
+        // Log but don't fail the whole operation if mapping already exists
+        console.warn(`[DB] bulkUpsertUsers - Could not upsert name mapping for ${user.name}/${user.wing}:`, mappingError.message);
       }
     } catch (error: any) {
       results.errors.push({ name: user.name, error: error.message || 'Unknown error' });

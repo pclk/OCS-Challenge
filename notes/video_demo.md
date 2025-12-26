@@ -76,7 +76,7 @@ We can view the score management accordingly here.
 Now let's explore the Reports section. [Go to user registration] To understand how reports work, let's go to the registration page.
 
 [
-    Name: damien
+    Name: JEFF SU
 ]
 
 If we try to register a name not in the system, the field is blocked. This prevents bots and unauthorized personnel from clogging the database, and accessing the leaderboard or submitting scores.
@@ -103,4 +103,56 @@ The account conflict report pops up, allowing me to fill out a report to the adm
 
 We can see the account conflict report in our admin view. Notice the report type is displayed as ACCOUNT_CONFLICT. [Click Approve Account] We can use the quick fix "Approve Account" button to approve the existing account, resolving the conflict. Alternatively, we may resolve the account by replacing the password via deletion and recreation if needed. The report can be dismissed after handling.
 
+What if we want to add exercises? That would have to be on OCS level. [Go to OCS Level 8CX9XfgxDVtDPIPcZ03DumN7oMKqIoOB] Let's go there.
+
+Creating exercises is just as easy as a form field. Let's add "Jumping Jacks". [Enter jumping jacks into create exercise and submit]
+
+Let's take a look at how it looks like from the user's perspective [Go to user view and login]
+
 This concludes the current feature set for the OCS PT Challenge. I hope you've gained a better understanding of the project.
+
+---
+
+## Recording Instructions
+
+1. Prep: Delete user Siew Wei Heng
+2. Prep: Logout admin panel
+3. Register user: Name: Siew Wei Heng, Wing: DIS Wing, Password: weiheng
+4. Close the website
+5. Reopen the website
+6. Click icon (user settings at top right)
+7. Close (user settings modal)
+8. Click on a user (in leaderboard)
+9. Close (user score timeline modal)
+10. Open inspect element and set mobile setting
+11. Enter exercises: Burpees: 20, Pushups: 20
+12. Exit mobile setting
+13. Go to admin panel
+14. Admin login: Password: Wm1qIhpmiJlhb2Qe71D0OD4nbbKMCnae
+15. Click Nominal Rolls (button)
+16. Click ? (question mark help button)
+17. Go to sheets.google.com
+18. Input the name column (in Google Sheets)
+19. Google Sheets names: "JEFF BEZOS", "ELON MUSK", "LEE CHONG WEI"
+20. Files > Download > .csv
+21. Go to webapp
+22. Upload (the CSV file)
+23. Click on Create (user button)
+24. Close (create user modal)
+25. Go to user registration (page)
+26. Register (not found): Name: damien
+27. Click report (button)
+28. Submit report
+29. Submit the report
+30. Go to admin view
+31. Click ? next to Reports
+32. Click ? next to type (hover over question mark)
+33. Click Create Account (button)
+34. Go to register page
+35. Register (conflict): Name: SIEW WEI HENG, Wing: DIS WING, Password: lmao
+36. Submit the report
+37. Go to admin view
+38. Click Approve Account (button)
+39. Admin login: Password: 8CX9XfgxDVtDPIPcZ03DumN7oMKqIoOB
+40. Enter jumping jacks into create exercise and submit
+41. Go to user view and login, looking for the jumping jack exercise at the bottom.
