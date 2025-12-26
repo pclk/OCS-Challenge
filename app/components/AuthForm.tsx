@@ -124,10 +124,12 @@ export default function AuthForm() {
   // Focus password field when wing is selected (registration mode)
   useEffect(() => {
     if (!isLogin && wing.trim() && name.trim() && passwordRef.current) {
-      // Small delay to ensure the field is rendered
+      // Delay to ensure the field is rendered, but not too long to avoid conflicts
       const timeoutId = setTimeout(() => {
-        passwordRef.current?.focus();
-      }, 100);
+        if (passwordRef.current) {
+          passwordRef.current.focus();
+        }
+      }, 150);
       return () => clearTimeout(timeoutId);
     }
   }, [isLogin, wing, name]);
@@ -380,15 +382,23 @@ export default function AuthForm() {
                       passwordInput.focus();
                     }
                   } else if (!isLogin && name.trim() && wing.trim()) {
+                    // For registration mode, always try to focus password field
+                    // The useEffect will also handle this, but this ensures it happens on Enter key
                     const passwordInput = document.getElementById('password') as HTMLInputElement;
                     if (passwordInput) {
                       passwordInput.focus();
                     }
+                    // Never focus submit button in registration mode - password field is always available
                   } else {
-                    // Focus submit button
-                    const submitButton = document.querySelector('button[type="submit"]') as HTMLButtonElement;
-                    if (submitButton) {
-                      submitButton.focus();
+                    // Only focus submit button if we're in login mode and password field is not available
+                    if (isLogin) {
+                      const passwordInput = document.getElementById('password') as HTMLInputElement;
+                      if (!passwordInput || passwordInput.offsetParent === null) {
+                        const submitButton = document.querySelector('button[type="submit"]') as HTMLButtonElement;
+                        if (submitButton) {
+                          submitButton.focus();
+                        }
+                      }
                     }
                   }
                 }, 150);
