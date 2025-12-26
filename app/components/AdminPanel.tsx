@@ -917,11 +917,6 @@ export default function AdminPanel() {
                                 onMouseEnter={() => setHoveredType(report.id)}
                                 onMouseLeave={() => setHoveredType(null)}
                                 className="text-[#ff7301] hover:text-white transition-colors text-xs leading-none w-4 h-4 flex items-center justify-center rounded-full hover:bg-[#ff7301]"
-                                title={report.type === 'ACCOUNT_CONFLICT' 
-                                  ? 'Account conflict: User reports that an account with their name already exists with a password set'
-                                  : report.type === 'NEW_ACCOUNT_REQUEST'
-                                  ? 'New account request: User cannot find their name and requests a new account'
-                                  : 'Unknown report type'}
                                 aria-label="Type help"
                               >
                                 ?

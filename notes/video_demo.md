@@ -23,6 +23,8 @@ We can also view other user's score timeline by clicking on their names.
 
 [Close ]
 
+[Click Export button] The leaderboard also supports exporting data to CSV format. Clicking the export button downloads the current view - whether it's Total Reps, Exercise-Based, or All Scores - as a CSV file for offline analysis or record-keeping.
+
 [Open inspect element and set mobile setting.]
 
 The interface is fully responsive. It automatically adapts to mobile or desktop screens, ensuring a smooth experience on any device.
@@ -67,9 +69,13 @@ Finally, go back to the OCS PT Challenge web app, [upload ] upload our file, and
 
 As you can see, the users tables are updated.
 
-[Click on Create] Clicking on create, we can fill in new cadet names and passwords for fringe cases.
+[Click on Create] Clicking on create, we can fill in new cadet names and passwords for fringe cases. Let's create a test user to demonstrate this functionality.
 
-[Close ]
+[
+    Name: test
+]
+
+[Submit] As you can see, the user is created and appears in the users table. Now let's delete this test user to clean up. [Click Delete on test user] [Confirm deletion] The user has been successfully removed from the system.
 
 [Click Edit on a user] To manage scores for a user, we can click the Edit button on any user. This opens the Edit User interface with two tabs: User Details and Score Management. [Click Score Management tab] In the Score Management tab, we can view all scores for that user and delete any scores if needed.
 
@@ -118,7 +124,7 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 ## Recording Instructions
 
 ### Pre-Recording Setup
-- [ ] **Delete user**: Siew Wei Heng JEFF BEZO, ELON MUSK and LEE CHONG WEI
+- [ ] **Delete user**: Siew Wei Heng, JEFF BEZOS, ELON MUSK, LEE CHONG WEI
 - [ ] **Logout** from admin panel (if logged in)
 - [ ] Delete the sheets.google.csv fields
 
@@ -134,7 +140,6 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 **2. Test Session Persistence**
 - Close the website
 - Reopen the website
-- Verify user remains logged in
 
 **3. User Settings**
 - Click **user icon** (top right)
@@ -144,6 +149,11 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 - Click on a **user name** (in leaderboard)
 - View user score timeline
 - Close the modal
+
+**4a. Export Leaderboard Data**
+- Click the **Export button** (download icon) in the leaderboard header
+- Verify CSV file downloads with appropriate filename based on current tab:
+  - Total Reps tab: `total-reps-leaderboard-YYYY-MM-DD.csv`
 
 **5. Mobile Responsiveness**
 - Open **inspect element** and set mobile view
@@ -173,9 +183,17 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 - **Upload** the CSV file
 - Verify users table is updated
 
-**8. Manual User Creation**
+**8. Manual User Creation and Deletion**
 - Click **"Create User"** button
-- Close the modal
+- Fill in the form:
+  - Name: `test`
+  - Wing: `DIS Wing`
+  - Password: `test123`
+- Click **"Create"** or **"Submit"** button
+- Verify user appears in the users table
+- Click **"Delete"** button on the "test" user
+- Confirm deletion in the confirmation modal
+- Verify user is removed from the table
 
 **9. Score Management (via Edit User)**
 - Click **"Edit"** button on any user in the Users table
@@ -241,3 +259,12 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 **18. Verify Exercise in User View**
 - Go to **user view** and login
 - Verify "Jumping Jacks" exercise appears at the bottom
+
+
+### Keys
+
+**6. Admin Login (Wing Level)**
+- Password: `Wm1qIhpmiJlhb2Qe71D0OD4nbbKMCnae`
+
+**16. Admin Login (OCS Level)**
+- Password: `8CX9XfgxDVtDPIPcZ03DumN7oMKqIoOB`
