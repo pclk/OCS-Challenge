@@ -13,6 +13,8 @@ interface SearchableDropdownProps {
   onEnterPress?: () => void; // Callback when Enter is pressed and option is selected
   loading?: boolean; // Whether options are still loading
   disabled?: boolean; // Whether the input is disabled
+  noMatchesMessage?: string; // Custom message when no matches are found
+  onNoMatchesAction?: (inputValue: string) => void; // Action to perform when no matches (e.g., show report modal), receives the input value
 }
 
 export default function SearchableDropdown({
@@ -26,6 +28,8 @@ export default function SearchableDropdown({
   onEnterPress,
   loading = false,
   disabled = false,
+  noMatchesMessage,
+  onNoMatchesAction,
 }: SearchableDropdownProps) {
   const [inputValue, setInputValue] = useState(value || '');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -115,18 +119,31 @@ export default function SearchableDropdown({
     if (relevantOption) {
       handleSelect(relevantOption); // Will now always move focus if value exists
     } else {
-      // No valid match - clear but don't move focus
-      setInputValue('');
-      onChange('');
-      setShowDropdown(false);
+      // No valid match - check if we should trigger the no matches action
+      if (inputValue.trim() && filteredOptions.length === 0 && onNoMatchesAction) {
+        // Trigger the action (e.g., show report modal) and pass the input value
+        onNoMatchesAction(inputValue.trim());
+        setShowDropdown(false);
+      } else {
+        // No valid match - clear but don't move focus
+        setInputValue('');
+        onChange('');
+        setShowDropdown(false);
+      }
     }
-  }, [inputValue, filteredOptions, handleSelect, onChange]);
+  }, [inputValue, filteredOptions, handleSelect, onChange, onNoMatchesAction]);
 
   // Handle Enter key press
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleConfirmSelection();
+      // If there's no match and we have a no matches action, trigger it directly
+      if (inputValue.trim() && filteredOptions.length === 0 && onNoMatchesAction) {
+        onNoMatchesAction(inputValue.trim());
+        setShowDropdown(false);
+      } else {
+        handleConfirmSelection();
+      }
     }
   };
 
@@ -297,7 +314,23 @@ export default function SearchableDropdown({
           ref={dropdownRef}
           className="absolute z-10 w-full mt-1 bg-black border border-white/20 rounded-md shadow-lg p-3"
         >
-          <p className="text-white/70 text-sm">No matching options found</p>
+          {noMatchesMessage ? (
+            <button
+              type="button"
+              onClick={() => onNoMatchesAction?.(inputValue.trim())}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && onNoMatchesAction) {
+                  e.preventDefault();
+                  onNoMatchesAction(inputValue.trim());
+                }
+              }}
+              className="text-left w-full text-[#ff7301] hover:text-[#ff7301]/80 text-sm transition-colors underline"
+            >
+              {noMatchesMessage}
+            </button>
+          ) : (
+            <p className="text-white/70 text-sm">No matching options found</p>
+          )}
         </div>
       )}
     </div>

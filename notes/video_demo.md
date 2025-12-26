@@ -6,8 +6,8 @@ In 2025, A fitness challenge called the OCS 59 PT Challenge was proposed, but re
 
 Introducing the OCS PT Challenge webapp. Let's register a user. 
 [
-    Name: Siew Wei Heng
     Wing: DIS Wing
+    Name: Siew Wei Heng
     Password: weiheng
 ]
 
@@ -72,6 +72,7 @@ As you can see, the users tables are updated.
 [Click on Create] Clicking on create, we can fill in new cadet names and passwords for fringe cases. Let's create a test user to demonstrate this functionality.
 
 [
+    Wing: DIS Wing
     Name: test
 ]
 
@@ -84,6 +85,7 @@ As you can see, the users tables are updated.
 Now let's explore the Reports section. [Go to user registration] To understand how reports work, let's go to the registration page.
 
 [
+    Wing: DIS WING
     Name: JEFF SU
 ]
 
@@ -102,8 +104,8 @@ In the correct admin wing, we can see the Reports section. Each report displays 
 [Go to register page] For account conflict, let's say that a malicious or careless actor has already signed into your account before you even did, and set a password "weiheng" so that you cannot login. Let's simulate the victim trying to register with their desired password.
 
 [
-    Name: SIEW WEI HENG
     Wing: DIS WING
+    Name: SIEW WEI HENG
     Password: lmao
 ]
 
@@ -138,8 +140,8 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 ### User Registration & Basic Features
 
 **1. Register New User**
-- Name: `Siew Wei Heng`
 - Wing: `DIS Wing`
+- Name: `Siew Wei Heng`
 - Password: `weiheng`
 
 **2. Test Session Persistence**
@@ -191,8 +193,8 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 **8. Manual User Creation and Deletion**
 - Click **"Create User"** button
 - Fill in the form:
-  - Name: `test`
   - Wing: `DIS Wing`
+  - Name: `test`
   - Password: `test123`
 - Click **"Create"** or **"Submit"** button
 - Verify user appears in the users table
@@ -213,14 +215,15 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 
 **11. Test Registration Block**
 - Go to **user registration** page
+- Select Wing: `DIS WING`
 - Try to register: Name: `JEFF SU` (not in system)
 - Verify field is blocked
 
 **12. Submit New Account Report**
 - Click **"Report"** button
 - Fill out report form:
-  - Name: `JEFF SU`
   - Wing: DIS WING
+  - Name: `JEFF SU`
   - Password: weiheng
   - (Optional) Fill in email, phone, notes
 - **Submit report**
@@ -234,8 +237,8 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 **13a. Verify Account Creation - Login as JEFF SU**
 - Go to **login page**
 - Enter credentials:
-  - Name: `JEFF SU`
   - Wing: DIS WING
+  - Name: `JEFF SU`
   - Password: weiheng
 - Click **Login** or press Enter
 - Verify login succeeds and user is logged in
@@ -248,8 +251,8 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 - **First, ensure account exists with password "weiheng"** (this should already exist from initial registration)
 - Go to **register page**
 - Try to register:
-  - Name: `SIEW WEI HENG`
   - Wing: `DIS WING`
+  - Name: `SIEW WEI HENG`
   - Password: `lmao`
 - Account conflict report should appear
 - **Submit the report** (with password "lmao" in the report)
@@ -263,13 +266,13 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 **15a. Verify Password Change**
 - Go to **login page**
 - Try to login with:
-  - Name: `SIEW WEI HENG`
   - Wing: `DIS WING`
+  - Name: `SIEW WEI HENG`
   - Password: `weiheng` (old password)
 - Verify login **fails** (password no longer works)
 - Try to login with:
-  - Name: `SIEW WEI HENG`
   - Wing: `DIS WING`
+  - Name: `SIEW WEI HENG`
   - Password: `lmao` (new password from report)
 - Verify login **succeeds** (password was successfully updated)
 

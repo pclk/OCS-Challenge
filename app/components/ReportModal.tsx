@@ -20,7 +20,9 @@ export default function ReportModal({ initialName = '', initialWing = '', isAcco
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [wings, setWings] = useState<string[]>([]);
+  const [names, setNames] = useState<string[]>([]);
   const [loadingWings, setLoadingWings] = useState(false);
+  const [loadingNames, setLoadingNames] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -29,6 +31,15 @@ export default function ReportModal({ initialName = '', initialWing = '', isAcco
     if (initialName) setName(initialName);
     if (initialWing) setWing(initialWing);
   }, [initialName, initialWing]);
+
+  // Fetch names when wing changes
+  useEffect(() => {
+    if (wing.trim()) {
+      fetchNamesByWing(wing);
+    } else {
+      setNames([]);
+    }
+  }, [wing]);
 
   const fetchWings = async () => {
     setLoadingWings(true);
@@ -42,6 +53,21 @@ export default function ReportModal({ initialName = '', initialWing = '', isAcco
       console.error('Error fetching wings:', error);
     } finally {
       setLoadingWings(false);
+    }
+  };
+
+  const fetchNamesByWing = async (wingValue: string) => {
+    setLoadingNames(true);
+    try {
+      const response = await fetch(`/api/names-by-wing?wing=${encodeURIComponent(wingValue)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setNames(data);
+      }
+    } catch (error) {
+      console.error('Error fetching names:', error);
+    } finally {
+      setLoadingNames(false);
     }
   };
 
@@ -129,6 +155,32 @@ export default function ReportModal({ initialName = '', initialWing = '', isAcco
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
+              <SearchableDropdown
+                id="report-wing"
+                options={wings}
+                value={wing}
+                onChange={(value) => {
+                  setWing(value);
+                  setName(''); // Clear name when wing changes
+                }}
+                placeholder="Search or select wing"
+                label="Wing *"
+                required
+                loading={loadingWings}
+                disabled={isSubmitting}
+                onEnterPress={() => {
+                  // Focus on name field after wing is selected
+                  setTimeout(() => {
+                    const nameInput = document.getElementById('report-name') as HTMLInputElement;
+                    if (nameInput) {
+                      nameInput.focus();
+                    }
+                  }, 100);
+                }}
+              />
+            </div>
+
+            <div>
               <label htmlFor="report-name" className="block text-sm font-medium text-white mb-1">
                 Name *
               </label>
@@ -139,23 +191,9 @@ export default function ReportModal({ initialName = '', initialWing = '', isAcco
                 onChange={(e) => setName(e.target.value.toUpperCase())}
                 className="w-full px-3 py-2 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white uppercase"
                 style={{ textTransform: 'uppercase' }}
-                placeholder="Enter your name"
+                placeholder={wing.trim() ? "Enter your name" : "Select wing first"}
                 required
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <SearchableDropdown
-                id="report-wing"
-                options={wings}
-                value={wing}
-                onChange={setWing}
-                placeholder="Search or select wing"
-                label="Wing *"
-                required
-                loading={loadingWings}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !wing.trim()}
               />
             </div>
 

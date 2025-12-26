@@ -161,24 +161,13 @@ export default function EditUserModal({
 
             {activeTab === 'edit' && (
               <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-white mb-1">Name *</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => onFormChange({ ...formData, name: e.target.value.toUpperCase() })}
-                className="w-full px-3 py-2 border border-white/20 rounded-md bg-black text-white uppercase"
-                style={{ textTransform: 'uppercase' }}
-                required
-              />
-            </div>
             {adminLevel === 'OCS' && (
               <div>
                 <label className="block text-sm font-medium text-white mb-1">Wing</label>
                 <input
                   type="text"
                   value={formData.wing}
-                  onChange={(e) => onFormChange({ ...formData, wing: e.target.value })}
+                  onChange={(e) => onFormChange({ ...formData, wing: e.target.value, name: '' })}
                   className="w-full px-3 py-2 border border-white/20 rounded-md bg-black text-white"
                 />
               </div>
@@ -195,6 +184,17 @@ export default function EditUserModal({
                 <p className="text-white/50 text-xs mt-1">Wing cannot be changed</p>
               </div>
             )}
+            <div>
+              <label className="block text-sm font-medium text-white mb-1">Name *</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => onFormChange({ ...formData, name: e.target.value.toUpperCase() })}
+                className="w-full px-3 py-2 border border-white/20 rounded-md bg-black text-white uppercase"
+                style={{ textTransform: 'uppercase' }}
+                required
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-white mb-1">New Password (leave empty to keep current)</label>
               <input

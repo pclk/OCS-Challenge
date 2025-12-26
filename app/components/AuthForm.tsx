@@ -36,8 +36,17 @@ export default function AuthForm() {
 
   useEffect(() => {
     fetchWings();
-    fetchNames(); // Always fetch names for login dropdown
+    // Don't fetch names initially - wait for wing selection
   }, []);
+
+  // Fetch names when wing changes
+  useEffect(() => {
+    if (wing.trim()) {
+      fetchNamesByWing(wing);
+    } else {
+      setNames([]);
+    }
+  }, [wing]);
 
   const fetchWings = async () => {
     setLoadingWings(true);
@@ -58,10 +67,10 @@ export default function AuthForm() {
     }
   };
 
-  const fetchNames = async () => {
+  const fetchNamesByWing = async (wingValue: string) => {
     setLoadingNames(true);
     try {
-      const response = await fetch('/api/names');
+      const response = await fetch(`/api/names-by-wing?wing=${encodeURIComponent(wingValue)}`);
       if (response.ok) {
         const data = await response.json();
         setNames(data);
@@ -77,7 +86,7 @@ export default function AuthForm() {
     }
   };
 
-  // Check password status when name or wing changes
+  // Check password status when name or wing changes (only for login mode)
   useEffect(() => {
     if (!isLogin || !name.trim() || !wing.trim() || password.trim()) {
       setUserNeedsPassword(null);
@@ -121,7 +130,21 @@ export default function AuthForm() {
     }
   }, [isLogin, userNeedsPassword, name, wing]);
 
-  // Focus password field when wing is selected (registration mode)
+  // Focus name field when wing is selected and names finish loading
+  useEffect(() => {
+    if (wing.trim() && !name.trim() && !loadingNames) {
+      // Wait a bit longer to ensure the field is fully enabled and rendered
+      const timeoutId = setTimeout(() => {
+        const nameInput = document.getElementById('name') as HTMLInputElement;
+        if (nameInput && !nameInput.disabled) {
+          nameInput.focus();
+        }
+      }, 250);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [wing, name, loadingNames]);
+
+  // Focus password field when name is selected (registration mode)
   useEffect(() => {
     if (!isLogin && wing.trim() && name.trim() && passwordRef.current) {
       // Delay to ensure the field is rendered, but not too long to avoid conflicts
@@ -276,16 +299,74 @@ export default function AuthForm() {
   return (
     <div className="bg-black border border-white/20 rounded-lg shadow-md mb-6">
       <div className="p-6">
-        <h2 className="text-2xl font-bold text-white mb-4">
-          {isLogin ? 'Login' : 'Register'}
-        </h2>
-        <p className="text-white/70 mb-6">
-          {isLogin
-            ? 'Enter your credentials to access the leaderboard'
-            : 'Create an account to submit your scores'}
-        </p>
+        <div className="flex flex-row items-center justify-between border-b border-white/20 mb-6">
+          <div className="flex flex-nowrap">
+            <button
+              type="button"
+              onClick={() => {
+                setIsLogin(true);
+                setName('');
+                setWing('');
+                setPassword('');
+              }}
+              className={`px-6 py-3 font-semibold transition-colors whitespace-nowrap ${
+                isLogin
+                  ? 'text-[#ff7301] border-b-2 border-[#ff7301]'
+                  : 'text-white/70 hover:text-white'
+              }`}
+              disabled={isSubmitting}
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsLogin(false);
+                setName('');
+                setWing('');
+                setPassword('');
+              }}
+              className={`px-6 py-3 font-semibold transition-colors whitespace-nowrap ${
+                !isLogin
+                  ? 'text-[#ff7301] border-b-2 border-[#ff7301]'
+                  : 'text-white/70 hover:text-white'
+              }`}
+              disabled={isSubmitting}
+            >
+              Register
+            </button>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <SearchableDropdown
+              id="wing"
+              options={wings}
+              value={wing}
+              onChange={(value) => {
+                setWing(value);
+                setName(''); // Clear name when wing changes
+                setPassword(''); // Clear password when wing changes
+                setUserNeedsPassword(null);
+              }}
+              placeholder="Search or select wing"
+              label="Wing"
+              required
+              loading={loadingWings}
+              disabled={isSubmitting}
+              onEnterPress={() => {
+                // Focus on name field after wing is selected
+                setTimeout(() => {
+                  const nameInput = document.getElementById('name') as HTMLInputElement;
+                  if (nameInput) {
+                    nameInput.focus();
+                  }
+                }, 100);
+              }}
+            />
+          </div>
+
           <div>
             {isLogin ? (
               <>
@@ -298,17 +379,24 @@ export default function AuthForm() {
                     setPassword(''); // Clear password when name changes
                     setUserNeedsPassword(null);
                   }}
-                  placeholder="Search or select your name"
+                  placeholder={wing.trim() ? "Search or select your name" : "Select wing first"}
                   label="Name"
                   required
                   loading={loadingNames}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !wing.trim()}
                   onEnterPress={() => {
-                    // Focus on wing field
+                    // Focus on password field if it's visible, otherwise focus submit button
                     setTimeout(() => {
-                      const wingInput = document.getElementById('wing') as HTMLInputElement;
-                      if (wingInput) {
-                        wingInput.focus();
+                      if (isLogin && !userNeedsPassword && name.trim() && wing.trim()) {
+                        const passwordInput = document.getElementById('password') as HTMLInputElement;
+                        if (passwordInput) {
+                          passwordInput.focus();
+                        }
+                      } else {
+                        const submitButton = document.querySelector('button[type="submit"]') as HTMLButtonElement;
+                        if (submitButton) {
+                          submitButton.focus();
+                        }
                       }
                     }, 100);
                   }}
@@ -331,79 +419,31 @@ export default function AuthForm() {
                   options={names}
                   value={name}
                   onChange={setName}
-                  placeholder="Search or select your name"
+                  placeholder={wing.trim() ? "Search or select your name" : "Select wing first"}
                   label="Name"
                   required
                   loading={loadingNames}
-                  disabled={isSubmitting}
-                  onEnterPress={() => {
-                    // Focus on wing field
-                    setTimeout(() => {
-                      const wingInput = document.getElementById('wing') as HTMLInputElement;
-                      if (wingInput) {
-                        wingInput.focus();
-                      }
-                    }, 100);
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
+                  disabled={isSubmitting || !wing.trim()}
+                  noMatchesMessage="Don't see your name? Send a report to admin by clicking me or pressing enter!"
+                  onNoMatchesAction={(inputValue) => {
+                    // Set the name from the input value before showing the modal
+                    setName(inputValue.toUpperCase());
                     // Show new account request modal (not conflict)
                     setIsAccountConflictReport(false);
                     setShowReportModal(true);
                   }}
-                  className="mt-2 text-[#ff7301] hover:text-[#ff7301]/80 text-sm transition-colors underline"
-                  disabled={isSubmitting}
-                >
-                  Don't see your name? Send a report to admin by clicking me!
-                </button>
+                  onEnterPress={() => {
+                    // Focus on password field
+                    setTimeout(() => {
+                      const passwordInput = document.getElementById('password') as HTMLInputElement;
+                      if (passwordInput) {
+                        passwordInput.focus();
+                      }
+                    }, 100);
+                  }}
+                />
               </>
             )}
-          </div>
-
-          <div>
-            <SearchableDropdown
-              id="wing"
-              options={wings}
-              value={wing}
-              onChange={setWing}
-              placeholder="Search or select wing"
-              label="Wing"
-              required
-              loading={loadingWings}
-              disabled={isSubmitting}
-              onEnterPress={() => {
-                // Focus on password field if it's visible, otherwise focus submit button
-                setTimeout(() => {
-                  if (isLogin && !userNeedsPassword && name.trim() && wing.trim()) {
-                    const passwordInput = document.getElementById('password') as HTMLInputElement;
-                    if (passwordInput) {
-                      passwordInput.focus();
-                    }
-                  } else if (!isLogin && name.trim() && wing.trim()) {
-                    // For registration mode, always try to focus password field
-                    // The useEffect will also handle this, but this ensures it happens on Enter key
-                    const passwordInput = document.getElementById('password') as HTMLInputElement;
-                    if (passwordInput) {
-                      passwordInput.focus();
-                    }
-                    // Never focus submit button in registration mode - password field is always available
-                  } else {
-                    // Only focus submit button if we're in login mode and password field is not available
-                    if (isLogin) {
-                      const passwordInput = document.getElementById('password') as HTMLInputElement;
-                      if (!passwordInput || passwordInput.offsetParent === null) {
-                        const submitButton = document.querySelector('button[type="submit"]') as HTMLButtonElement;
-                        if (submitButton) {
-                          submitButton.focus();
-                        }
-                      }
-                    }
-                  }
-                }, 150);
-              }}
-            />
           </div>
 
           {isLogin && !userNeedsPassword && name.trim() && wing.trim() && (
@@ -535,23 +575,6 @@ export default function AuthForm() {
             </button>
           </div>
 
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setName('');
-                setWing('');
-                setPassword('');
-              }}
-              className="text-[#ff7301] hover:text-[#ff7301]/80 text-sm transition-colors"
-              disabled={isSubmitting}
-            >
-              {isLogin
-                ? "Don't have an account? Register"
-                : 'Already have an account? Login'}
-            </button>
-          </div>
         </form>
       </div>
       {showReportModal && (
