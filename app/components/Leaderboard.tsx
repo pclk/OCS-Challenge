@@ -275,29 +275,53 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     return processed;
   }, [allData, user, exercises, isUserEntry]);
 
-  // Helper to find user's entry in any dataset
-  const findUserEntry = useCallback((entries: TotalRepsEntry[] | ExerciseBasedEntry[] | LeaderboardEntry[]) => {
+  // Helper to find user's entry in TotalRepsEntry dataset
+  const findUserTotalRepsEntry = useCallback((entries: TotalRepsEntry[]) => {
     if (!user) return null;
     return entries.find(entry => isUserEntry(entry.user_name, entry.wing)) || null;
   }, [user, isUserEntry]);
 
-  // Helper to filter out user's entry from paginated data
-  const filterOutUserEntry = useCallback((entries: TotalRepsEntry[] | ExerciseBasedEntry[] | LeaderboardEntry[]) => {
+  // Helper to find user's entry in ExerciseBasedEntry dataset
+  const findUserExerciseEntry = useCallback((entries: ExerciseBasedEntry[]) => {
+    if (!user) return null;
+    return entries.find(entry => isUserEntry(entry.user_name, entry.wing)) || null;
+  }, [user, isUserEntry]);
+
+  // Helper to find user's entry in LeaderboardEntry dataset
+  const findUserLeaderboardEntry = useCallback((entries: LeaderboardEntry[]) => {
+    if (!user) return null;
+    return entries.find(entry => isUserEntry(entry.user_name, entry.wing)) || null;
+  }, [user, isUserEntry]);
+
+  // Helper to filter out user's entry from TotalRepsEntry data
+  const filterOutUserTotalReps = useCallback((entries: TotalRepsEntry[]) => {
+    if (!user) return entries;
+    return entries.filter(entry => !isUserEntry(entry.user_name, entry.wing));
+  }, [user, isUserEntry]);
+
+  // Helper to filter out user's entry from ExerciseBasedEntry data
+  const filterOutUserExercise = useCallback((entries: ExerciseBasedEntry[]) => {
+    if (!user) return entries;
+    return entries.filter(entry => !isUserEntry(entry.user_name, entry.wing));
+  }, [user, isUserEntry]);
+
+  // Helper to filter out user's entry from LeaderboardEntry data
+  const filterOutUserLeaderboard = useCallback((entries: LeaderboardEntry[]) => {
     if (!user) return entries;
     return entries.filter(entry => !isUserEntry(entry.user_name, entry.wing));
   }, [user, isUserEntry]);
 
   // Pagination helpers for Exercise-Based View
-  const exerciseDataWithoutUser = filterOutUserEntry(processedExerciseBasedData);
-  const userExerciseEntry = findUserEntry(processedExerciseBasedData) as ExerciseBasedEntry | null;
+  const exerciseDataWithoutUser = filterOutUserExercise(processedExerciseBasedData);
+  const userExerciseEntry = findUserExerciseEntry(processedExerciseBasedData);
   const totalPagesExercise = Math.ceil(exerciseDataWithoutUser.length / itemsPerPage);
   const startIndexExercise = (currentPage - 1) * itemsPerPage;
   const endIndexExercise = startIndexExercise + itemsPerPage;
   const paginatedExerciseData = exerciseDataWithoutUser.slice(startIndexExercise, endIndexExercise);
 
   // Pagination helpers for Total Reps View
-  const totalRepsDataWithoutUser = filterOutUserEntry(processedTotalRepsData);
-  const userTotalRepsEntry = findUserEntry(processedTotalRepsData) as TotalRepsEntry | null;
+  const totalRepsDataWithoutUser = filterOutUserTotalReps(processedTotalRepsData);
+  const userTotalRepsEntry = findUserTotalRepsEntry(processedTotalRepsData);
   const totalPagesTotalReps = Math.ceil(totalRepsDataWithoutUser.length / itemsPerPageTotal);
   const startIndexTotalReps = (currentPage - 1) * itemsPerPageTotal;
   const endIndexTotalReps = startIndexTotalReps + itemsPerPageTotal;
@@ -426,14 +450,14 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     const page = getExercisePage(exerciseName);
     const startIndex = (page - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    const entriesWithoutUser = filterOutUserEntry(entries) as LeaderboardEntry[];
+    const entriesWithoutUser = filterOutUserLeaderboard(entries);
     return entriesWithoutUser.slice(startIndex, endIndex);
   };
   const getUserEntryForExercise = (entries: LeaderboardEntry[]) => {
-    return findUserEntry(entries) as LeaderboardEntry | null;
+    return findUserLeaderboardEntry(entries);
   };
   const getTotalPages = (entries: LeaderboardEntry[]) => {
-    const entriesWithoutUser = filterOutUserEntry(entries);
+    const entriesWithoutUser = filterOutUserLeaderboard(entries);
     return Math.ceil(entriesWithoutUser.length / itemsPerPage);
   };
 
