@@ -15,6 +15,7 @@ interface SearchableDropdownProps {
   disabled?: boolean; // Whether the input is disabled
   noMatchesMessage?: string; // Custom message when no matches are found
   onNoMatchesAction?: (inputValue: string) => void; // Action to perform when no matches (e.g., show report modal), receives the input value
+  uppercase?: boolean; // Whether to convert input to uppercase
 }
 
 export default function SearchableDropdown({
@@ -30,6 +31,7 @@ export default function SearchableDropdown({
   disabled = false,
   noMatchesMessage,
   onNoMatchesAction,
+  uppercase = false,
 }: SearchableDropdownProps) {
   const [inputValue, setInputValue] = useState(value || '');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -71,7 +73,10 @@ export default function SearchableDropdown({
     if (!inputValue.trim()) return '';
     
     // Return first filtered option (already sorted by relevance)
-    if (filteredOptions.length > 0) return filteredOptions[0];
+    // Convert to uppercase if uppercase prop is enabled
+    if (filteredOptions.length > 0) {
+      return uppercase ? filteredOptions[0].toUpperCase() : filteredOptions[0];
+    }
     
     return '';
   };
@@ -79,10 +84,11 @@ export default function SearchableDropdown({
   // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value;
-    setInputValue(input);
+    const processedInput = uppercase ? input.toUpperCase() : input;
+    setInputValue(processedInput);
     setShowDropdown(true);
     // Don't auto-select on typing - only clear selection if input doesn't match current value
-    if (input !== value) {
+    if (processedInput !== value) {
       onChange('');
     }
   };
@@ -90,15 +96,17 @@ export default function SearchableDropdown({
   // Handle option selection
   const handleSelect = useCallback((option: string) => {
     isSelectingRef.current = true;
+    // Convert to uppercase if uppercase prop is enabled
+    const processedOption = uppercase ? option.toUpperCase() : option;
     // Set input value first to ensure it's visible
-    setInputValue(option);
+    setInputValue(processedOption);
     // Then update the parent component
-    onChange(option);
+    onChange(processedOption);
     // Close dropdown
     setShowDropdown(false);
     
     // Always move focus if value exists and callback provided
-    if (option && onEnterPress) {
+    if (processedOption && onEnterPress) {
       setTimeout(() => {
         inputRef.current?.blur();
         isSelectingRef.current = false;
@@ -111,7 +119,7 @@ export default function SearchableDropdown({
         isSelectingRef.current = false;
       }, 50);
     }
-  }, [onChange, onEnterPress]);
+  }, [onChange, onEnterPress, uppercase]);
 
   // Shared logic for confirming selection (Enter key or click outside)
   const handleConfirmSelection = useCallback(() => {
@@ -175,7 +183,9 @@ export default function SearchableDropdown({
       
       if (!isUserTyping) {
         // Sync when value prop is set externally (e.g., auto-fill or form reset with new value)
-        setInputValue(value);
+        // Convert to uppercase if uppercase prop is enabled
+        const syncedValue = uppercase ? value.toUpperCase() : value;
+        setInputValue(syncedValue);
         // Ensure dropdown closes when value is set externally (auto-fill scenario)
         setShowDropdown(false);
       }
@@ -183,7 +193,7 @@ export default function SearchableDropdown({
     
     // Update previous value ref
     previousValueRef.current = value || '';
-  }, [value, inputValue]); // Include inputValue to check typing state
+  }, [value, inputValue, uppercase]); // Include uppercase to handle conversion
 
   // Close dropdown when clicking outside (with same behavior as Enter key)
   useEffect(() => {
@@ -213,6 +223,11 @@ export default function SearchableDropdown({
         </label>
       )}
       <div className="relative">
+        {uppercase && id && (
+          <style dangerouslySetInnerHTML={{
+            __html: `#${id}::placeholder { text-transform: none !important; }`
+          }} />
+        )}
         <input
           ref={inputRef}
           id={id}
@@ -221,7 +236,8 @@ export default function SearchableDropdown({
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setShowDropdown(true)}
-          className="w-full px-3 py-2 pr-10 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white"
+          className={`w-full px-3 py-2 pr-10 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white ${uppercase ? 'uppercase' : ''}`}
+          style={uppercase ? { textTransform: 'uppercase' } : {}}
           placeholder={placeholder}
           required={required}
           autoComplete="off"

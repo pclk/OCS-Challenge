@@ -168,6 +168,7 @@ export default function ReportModal({ initialName = '', initialWing = '', isAcco
                 required
                 loading={loadingWings}
                 disabled={isSubmitting}
+                uppercase={true}
                 onEnterPress={() => {
                   // Focus on name field after wing is selected
                   setTimeout(() => {

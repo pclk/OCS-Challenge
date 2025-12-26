@@ -355,6 +355,7 @@ export default function AuthForm() {
               required
               loading={loadingWings}
               disabled={isSubmitting}
+              uppercase={true}
               onEnterPress={() => {
                 // Focus on name field after wing is selected
                 setTimeout(() => {
@@ -384,6 +385,7 @@ export default function AuthForm() {
                   required
                   loading={loadingNames}
                   disabled={isSubmitting || !wing.trim()}
+                  uppercase={true}
                   onEnterPress={() => {
                     // Focus on password field if it's visible, otherwise focus submit button
                     setTimeout(() => {
@@ -424,6 +426,7 @@ export default function AuthForm() {
                   required
                   loading={loadingNames}
                   disabled={isSubmitting || !wing.trim()}
+                  uppercase={true}
                   noMatchesMessage="Don't see your name? Send a report to admin by clicking me or pressing enter!"
                   onNoMatchesAction={(inputValue) => {
                     // Set the name from the input value before showing the modal
