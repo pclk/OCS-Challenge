@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import toast from 'react-hot-toast';
 import SearchableDropdown from './SearchableDropdown';
 import ExerciseIcon from './ExerciseIcon';
@@ -116,6 +116,11 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   }, []);
 
   const fetchData = useCallback(async () => {
+    // Prevent duplicate fetches
+    if (fetchingRef.current) {
+      return;
+    }
+    fetchingRef.current = true;
     setLoading(true);
     const loadingToast = toast.loading('Loading leaderboard...');
     try {
@@ -176,8 +181,15 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
       toast.error('Network error: Unable to fetch leaderboard. Please check your connection.');
     } finally {
       setLoading(false);
+      fetchingRef.current = false;
     }
-  }, [wing, activeTab, exercises, deduplicateEntries]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wing, activeTab, deduplicateEntries]);
+
+  // Memoize exercises length and IDs to prevent unnecessary refetches
+  const exercisesKey = useMemo(() => {
+    return exercises.map(e => `${e.id}-${e.name}`).join(',');
+  }, [exercises]);
 
   useEffect(() => {
     fetchData();
@@ -185,7 +197,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
       setCurrentPage(1); // Reset to first page when data changes (except for total view which has its own search)
     }
     setExercisePages({}); // Reset exercise pages
-  }, [fetchData]);
+  }, [wing, activeTab, exercisesKey, fetchData]);
 
   const getDisplayName = (entry: LeaderboardEntry | ExerciseBasedEntry) => {
     return entry.user_name;
@@ -678,7 +690,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                         <tr
                           className={`${
                             isUser 
-                              ? 'bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] sticky bottom-[120px] z-20' 
+                              ? 'bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] sticky bottom-[80px] z-20' 
                               : entry.achieved_goal 
                                 ? 'bg-green-900/30 border-b border-white/10' 
                                 : 'border-b border-white/10 hover:bg-white/5'
