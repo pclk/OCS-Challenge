@@ -86,13 +86,7 @@ export default function Home() {
       <main className="min-h-screen bg-black py-8 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <Image
-              src="/ocs_safti_gold.jpg"
-              alt="OCS SAFTI Gold"
-              width={80}
-              height={80}
-              className="object-contain"
-            />
+
             <h1 className="text-2xl sm:text-4xl font-bold text-white text-center sm:text-left">
               Exercise Leaderboard
             </h1>

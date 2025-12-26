@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminPassword } from '@/lib/auth';
+import { verifyAdminPassword, getAdminLevel, getWingFromPassword } from '@/lib/auth';
 
-async function verifyAdmin(request: NextRequest): Promise<boolean> {
+async function verifyAdmin(request: NextRequest): Promise<{ isAdmin: boolean; wing?: string | null }> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader) {
-    return false;
+    return { isAdmin: false };
   }
   const token = authHeader.replace('Bearer ', '');
-  return verifyAdminPassword(token);
+  const adminLevel = getAdminLevel(token);
+  const wing = getWingFromPassword(token);
+  if (adminLevel === 'OCS' || adminLevel === 'WING') {
+    return { isAdmin: true, wing };
+  }
+  return { isAdmin: false };
 }
 
 export async function GET(request: NextRequest) {
   try {
     // Verify admin access
-    const isAdmin = await verifyAdmin(request);
+    const { isAdmin, wing: adminWing } = await verifyAdmin(request);
     if (!isAdmin) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -28,9 +33,20 @@ export async function GET(request: NextRequest) {
     try {
       const response = await fetch(`${baseUrl}/api/auth/report-existing`);
       const data = await response.json();
+      const allReports = data.reports || [];
+      
+      // Filter by wing if wing admin
+      let filteredReports = allReports;
+      if (adminWing) {
+        filteredReports = allReports.filter((r: any) => {
+          const reportWing = (r.wing || '').trim();
+          return reportWing.toLowerCase() === adminWing.toLowerCase();
+        });
+      }
+      
       return NextResponse.json({
         success: true,
-        reports: data.reports || [],
+        reports: filteredReports,
       });
     } catch (error) {
       // If fetch fails, return empty array

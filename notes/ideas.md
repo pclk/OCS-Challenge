@@ -1,0 +1,1 @@
+- add polar flow integration and match with timestamp of adding exercise in order to verify authenticity of the reps.

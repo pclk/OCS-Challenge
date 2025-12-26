@@ -1,32 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPendingApprovals } from '@/lib/db';
-import { verifyAdminPassword, extractTokenFromHeader } from '@/lib/auth';
+import { getAdminLevel } from '@/lib/auth';
 
-// Simple admin session check (in production, use proper session management)
-async function verifyAdmin(request: NextRequest): Promise<boolean> {
+async function verifyWingAdmin(request: NextRequest): Promise<{ isAdmin: boolean; wing?: string }> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader) {
-    return false;
+    return { isAdmin: false };
+  }
+  const token = authHeader.replace('Bearer ', '');
+  const adminLevel = getAdminLevel(token);
+  
+  if (adminLevel === 'WING' || adminLevel === 'OCS') {
+    // For now, wing admins can see all pending approvals
+    // In the future, we can filter by the admin's assigned wing
+    return { isAdmin: true };
   }
   
-  // For simplicity, check if it's the admin password in header
-  // In production, use proper session tokens
-  const token = authHeader.replace('Bearer ', '');
-  return verifyAdminPassword(token);
+  return { isAdmin: false };
 }
 
 export async function GET(request: NextRequest) {
   try {
     // Verify admin access
-    const isAdmin = await verifyAdmin(request);
+    const { isAdmin, wing } = await verifyWingAdmin(request);
     if (!isAdmin) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized - Wing admin access required' },
         { status: 401 }
       );
     }
 
-    const pendingUsers = await getPendingApprovals();
+    const url = new URL(request.url);
+    const wingFilter = url.searchParams.get('wing') || wing;
+
+    const pendingUsers = await getPendingApprovals(wingFilter);
     return NextResponse.json({
       success: true,
       users: pendingUsers,

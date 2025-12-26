@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminPassword } from '@/lib/auth';
+import { getAdminLevel, getWingFromPassword } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,10 +13,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (verifyAdminPassword(password)) {
+    const adminLevel = getAdminLevel(password);
+    if (adminLevel) {
+      const wing = getWingFromPassword(password);
       return NextResponse.json({
         success: true,
         message: 'Admin authentication successful',
+        adminLevel,
+        wing: wing || undefined,
       });
     } else {
       return NextResponse.json(

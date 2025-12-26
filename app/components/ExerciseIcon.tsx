@@ -11,7 +11,8 @@ export default function ExerciseIcon({ exerciseName, className = 'w-5 h-5' }: Ex
   const normalizedName = exerciseName.toLowerCase().trim();
   
   // Map exercise names to image files
-  let imageSrc = '/burpee.png';
+  // Default to dumbbell.png for newly added exercises
+  let imageSrc = '/dumbbell.png';
   
   if (normalizedName.includes('burpee')) {
     imageSrc = '/burpee.png';

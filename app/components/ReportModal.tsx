@@ -80,9 +80,8 @@ export default function ReportModal({ initialName = '', initialWing = '', isAcco
           password: password.trim() || undefined,
           email: email.trim(),
           phone: phone.trim(),
-          notes: notes.trim() || (isAccountConflict 
-            ? 'Account already exists - possible impersonation. Requesting investigation to reclaim account.'
-            : 'Requesting new account creation - name not found in personnel CSV'),
+          notes: notes.trim(),
+          type: isAccountConflict ? 'ACCOUNT_CONFLICT' : 'NEW_ACCOUNT_REQUEST',
         }),
       });
 

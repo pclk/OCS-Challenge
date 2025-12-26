@@ -12,11 +12,12 @@ if (!SESSION_SECRET) {
   throw new Error('SESSION_SECRET environment variable is required. Please set it in .env.local or ensure PASSWORD_SALT is set.');
 }
 
-// Admin password
+// Admin passwords
+const OCS_ADMIN_PASSWORD = process.env.OCS_ADMIN_PASSWORD || '';
+const WING_ADMIN_PASSWORD = process.env.WING_ADMIN_PASSWORD || '';
+
+// Keep ADMIN_PASSWORD for backward compatibility
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
-if (!ADMIN_PASSWORD) {
-  throw new Error('ADMIN_PASSWORD environment variable is required. Please set it in .env.local');
-}
 
 // Token expiration (30 days in milliseconds)
 const TOKEN_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -121,13 +122,76 @@ export function verifySessionToken(token: string): TokenPayload | null {
 }
 
 /**
- * Verify admin password
+ * Verify OCS admin password
+ */
+export function verifyOCSAdminPassword(password: string): boolean {
+  return password === OCS_ADMIN_PASSWORD;
+}
+
+/**
+ * Verify Wing admin password
+ */
+export function verifyWingAdminPassword(password: string): boolean {
+  return password === WING_ADMIN_PASSWORD;
+}
+
+/**
+ * Get wing from wing-specific password
+ */
+export function getWingFromPassword(password: string): string | null {
+  const wingPasswords: Record<string, string> = {
+    'ALPHA_WING_PASSWORD': process.env.ALPHA_WING_PASSWORD || '',
+    'CHARLIE_WING_PASSWORD': process.env.CHARLIE_WING_PASSWORD || '',
+    'DELTA_WING_PASSWORD': process.env.DELTA_WING_PASSWORD || '',
+    'ECHO_WING_PASSWORD': process.env.ECHO_WING_PASSWORD || '',
+    'TANGO_WING_PASSWORD': process.env.TANGO_WING_PASSWORD || '',
+    'SIERRA_WING_PASSWORD': process.env.SIERRA_WING_PASSWORD || '',
+    'MIDS_WING_PASSWORD': process.env.MIDS_WING_PASSWORD || '',
+    'AIR_WING_PASSWORD': process.env.AIR_WING_PASSWORD || '',
+    'DIS_WING_PASSWORD': process.env.DIS_WING_PASSWORD || '',
+    'OCS_HQ_PASSWORD': process.env.OCS_HQ_PASSWORD || '',
+    'CLD_PASSWORD': process.env.CLD_PASSWORD || '',
+  };
+
+  const wingMapping: Record<string, string> = {
+    [wingPasswords['ALPHA_WING_PASSWORD']]: 'ALPHA WING',
+    [wingPasswords['CHARLIE_WING_PASSWORD']]: 'CHARLIE WING',
+    [wingPasswords['DELTA_WING_PASSWORD']]: 'DELTA WING',
+    [wingPasswords['ECHO_WING_PASSWORD']]: 'ECHO WING',
+    [wingPasswords['TANGO_WING_PASSWORD']]: 'TANGO WING',
+    [wingPasswords['SIERRA_WING_PASSWORD']]: 'SIERRA WING',
+    [wingPasswords['MIDS_WING_PASSWORD']]: 'MIDS WING',
+    [wingPasswords['AIR_WING_PASSWORD']]: 'AIR WING',
+    [wingPasswords['DIS_WING_PASSWORD']]: 'DIS WING',
+    [wingPasswords['OCS_HQ_PASSWORD']]: 'OCS HQ',
+    [wingPasswords['CLD_PASSWORD']]: 'CLD',
+  };
+
+  return wingMapping[password] || null;
+}
+
+/**
+ * Get admin level from password (returns 'OCS', 'WING', or null)
+ */
+export function getAdminLevel(password: string): 'OCS' | 'WING' | null {
+  if (verifyOCSAdminPassword(password)) {
+    return 'OCS';
+  }
+  if (verifyWingAdminPassword(password) || getWingFromPassword(password)) {
+    return 'WING';
+  }
+  // Backward compatibility with old ADMIN_PASSWORD
+  if (ADMIN_PASSWORD && password === ADMIN_PASSWORD) {
+    return 'OCS';
+  }
+  return null;
+}
+
+/**
+ * Verify admin password (backward compatibility - checks both levels)
  */
 export function verifyAdminPassword(password: string): boolean {
-    console.log('ADMIN_PASSWORD', ADMIN_PASSWORD, 'password', password);
-    console.log('process.env', process.env);
-
-  return password === ADMIN_PASSWORD;
+  return getAdminLevel(password) !== null;
 }
 
 /**

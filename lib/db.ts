@@ -544,19 +544,26 @@ export async function getUserById(id: number) {
 }
 
 // Get pending approvals
-export async function getPendingApprovals() {
+export async function getPendingApprovals(wing?: string) {
   await ensureInitialized();
-  const users = await prisma.$queryRaw<Array<{
+  let query = `
+    SELECT id, name, wing, created_at
+    FROM users
+    WHERE pending_approval = true AND approved = false
+  `;
+  
+  if (wing) {
+    query += ` AND wing = '${wing.replace(/'/g, "''")}'`;
+  }
+  
+  query += ` ORDER BY created_at ASC`;
+  
+  const users = await prisma.$queryRawUnsafe<Array<{
     id: number;
     name: string;
     wing: string | null;
     created_at: Date;
-  }>>`
-    SELECT id, name, wing, created_at
-    FROM users
-    WHERE pending_approval = true AND approved = false
-    ORDER BY created_at ASC
-  `;
+  }>>(query);
   
   return users.map(user => ({
     id: user.id,
@@ -611,6 +618,193 @@ export async function getAllUsers() {
     pendingApproval: user.pending_approval,
     createdAt: user.created_at,
   }));
+}
+
+// Get users with pagination and search
+export async function getUsersPaginated(
+  page: number = 1,
+  limit: number = 25,
+  search?: string,
+  wing?: string
+) {
+  await ensureInitialized();
+  
+  const offset = (page - 1) * limit;
+  
+  let whereClause = 'WHERE 1=1';
+  if (search) {
+    whereClause += ` AND (LOWER(name) LIKE LOWER('%${search.replace(/'/g, "''")}%') OR LOWER(COALESCE(wing, '')) LIKE LOWER('%${search.replace(/'/g, "''")}%'))`;
+  }
+  if (wing) {
+    // Use case-insensitive comparison and trim to handle any whitespace issues
+    const trimmedWing = wing.trim();
+    // Handle NULL wings: if wing is NULL in DB, it won't match (which is correct)
+    // Use UPPER and TRIM for case-insensitive matching
+    whereClause += ` AND wing IS NOT NULL AND TRIM(UPPER(wing)) = TRIM(UPPER('${trimmedWing.replace(/'/g, "''")}'))`;
+    console.log('[DB] getUsersPaginated - Filtering by wing:', trimmedWing);
+  }
+  
+  const users = await prisma.$queryRawUnsafe<Array<{
+    id: number;
+    name: string;
+    wing: string | null;
+    approved: boolean;
+    pending_approval: boolean;
+    created_at: Date;
+  }>>(`
+    SELECT id, name, wing, approved, pending_approval, created_at
+    FROM users
+    ${whereClause}
+    ORDER BY created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `);
+  
+  const totalResult = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(`
+    SELECT COUNT(*) as count
+    FROM users
+    ${whereClause}
+  `);
+  
+  const total = Number(totalResult[0].count);
+  
+  return {
+    users: users.map(user => ({
+      id: user.id,
+      name: user.name,
+      wing: user.wing,
+      approved: user.approved,
+      pendingApproval: user.pending_approval,
+      createdAt: user.created_at,
+    })),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+}
+
+// Get users with conflicts (for wing admin)
+// Conflicts: users with same name but different wings, or missing data
+export async function getUsersWithConflicts(wing?: string) {
+  await ensureInitialized();
+  
+  let query = `
+    SELECT DISTINCT u1.id, u1.name, u1.wing, u1.approved, u1.pending_approval, u1.created_at,
+           COUNT(DISTINCT u2.id) as conflict_count
+    FROM users u1
+    LEFT JOIN users u2 ON u1.name = u2.name AND (u1.wing != u2.wing OR (u1.wing IS NULL AND u2.wing IS NOT NULL) OR (u1.wing IS NOT NULL AND u2.wing IS NULL))
+    WHERE (u1.wing IS NULL OR u1.name IN (
+      SELECT name FROM users GROUP BY name HAVING COUNT(DISTINCT COALESCE(wing, '')) > 1
+    ))
+  `;
+  
+  if (wing) {
+    query += ` AND u1.wing = '${wing}'`;
+  }
+  
+  query += `
+    GROUP BY u1.id, u1.name, u1.wing, u1.approved, u1.pending_approval, u1.created_at
+    HAVING COUNT(DISTINCT u2.id) > 0 OR u1.wing IS NULL
+    ORDER BY u1.created_at DESC
+  `;
+  
+  const conflicts = await prisma.$queryRawUnsafe<Array<{
+    id: number;
+    name: string;
+    wing: string | null;
+    approved: boolean;
+    pending_approval: boolean;
+    created_at: Date;
+    conflict_count: bigint;
+  }>>(query);
+  
+  return conflicts.map(conflict => ({
+    id: conflict.id,
+    name: conflict.name,
+    wing: conflict.wing,
+    approved: conflict.approved,
+    pendingApproval: conflict.pending_approval,
+    createdAt: conflict.created_at,
+    conflictCount: Number(conflict.conflict_count),
+  }));
+}
+
+// Resolve conflict by merging users (keep target, delete source)
+export async function resolveConflictByMerge(targetUserId: number, sourceUserId: number) {
+  await ensureInitialized();
+  
+  // Get both users
+  const targetUser = await getUserById(targetUserId);
+  const sourceUser = await getUserById(sourceUserId);
+  
+  if (!targetUser || !sourceUser) {
+    throw new Error('One or both users not found');
+  }
+  
+  // Move all scores from source to target
+  await prisma.$executeRawUnsafe(`
+    UPDATE scores
+    SET user_id = ${targetUserId}
+    WHERE user_id = ${sourceUserId}
+  `);
+  
+  // Delete source user
+  await prisma.$executeRawUnsafe(`
+    DELETE FROM users WHERE id = ${sourceUserId}
+  `);
+  
+  return targetUser;
+}
+
+// Bulk create/update users from CSV data
+export async function bulkUpsertUsers(users: Array<{ name: string; wing: string }>) {
+  await ensureInitialized();
+  
+  const results = {
+    created: 0,
+    updated: 0,
+    errors: [] as Array<{ name: string; error: string }>,
+  };
+  
+  for (const user of users) {
+    try {
+      // Check if user exists using parameterized query
+      const existing = await prisma.$queryRaw<Array<{ id: number }>>`
+        SELECT id FROM users WHERE name = ${user.name} AND wing = ${user.wing} LIMIT 1
+      `;
+      
+      if (existing.length > 0) {
+        // User exists, count as updated
+        results.updated++;
+      } else {
+        // Create new user using Prisma create (safer)
+        try {
+          await prisma.user.create({
+            data: {
+              name: user.name,
+              wing: user.wing,
+              approved: true,
+              pendingApproval: false,
+            },
+          });
+          results.created++;
+        } catch (createError: any) {
+          // If unique constraint violation, user already exists
+          if (createError.code === 'P2002') {
+            results.updated++;
+          } else {
+            throw createError;
+          }
+        }
+      }
+    } catch (error: any) {
+      results.errors.push({ name: user.name, error: error.message || 'Unknown error' });
+    }
+  }
+  
+  return results;
 }
 
 // Create a new user (admin function)
@@ -811,8 +1005,10 @@ export async function logAccountAction(
 }
 
 // Get all account actions (for admin)
-export async function getAccountActions(limit: number = 100) {
+export async function getAccountActions(limit: number = 100, page: number = 1) {
   await ensureInitialized();
+  const offset = (page - 1) * limit;
+  
   const actions = await prisma.$queryRaw<Array<{
     id: number;
     user_id: number | null;
@@ -825,18 +1021,32 @@ export async function getAccountActions(limit: number = 100) {
     SELECT id, user_id, user_name, user_wing, action, details, created_at
     FROM account_actions
     ORDER BY created_at DESC
-    LIMIT ${limit}
+    LIMIT ${limit} OFFSET ${offset}
   `;
   
-  return actions.map(action => ({
-    id: action.id,
-    userId: action.user_id,
-    userName: action.user_name,
-    userWing: action.user_wing,
-    action: action.action,
-    details: action.details ? JSON.parse(action.details) : null,
-    createdAt: action.created_at,
-  }));
+  const totalResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
+    SELECT COUNT(*) as count FROM account_actions
+  `;
+  
+  const total = Number(totalResult[0].count);
+  
+  return {
+    actions: actions.map(action => ({
+      id: action.id,
+      userId: action.user_id,
+      userName: action.user_name,
+      userWing: action.user_wing,
+      action: action.action,
+      details: action.details ? JSON.parse(action.details) : null,
+      createdAt: action.created_at,
+    })),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 }
 
 // Get all wings
@@ -981,6 +1191,71 @@ export async function getExerciseById(id: number) {
   return exercise;
 }
 
+// Create a new exercise
+export async function createExercise(name: string, type: ExerciseType) {
+  await ensureInitialized();
+  const exercise = await prisma.exercise.create({
+    data: {
+      name,
+      type,
+    },
+  });
+  console.log('[DB] createExercise - Created exercise:', JSON.stringify({
+    function: 'createExercise',
+    parameters: { name, type },
+    result: { id: exercise.id },
+  }, null, 2));
+  return exercise;
+}
+
+// Update an exercise
+export async function updateExercise(id: number, name?: string, type?: ExerciseType) {
+  await ensureInitialized();
+  const updateData: any = {};
+  if (name !== undefined) updateData.name = name;
+  if (type !== undefined) updateData.type = type;
+
+  const exercise = await prisma.exercise.update({
+    where: { id },
+    data: updateData,
+  });
+  console.log('[DB] updateExercise - Updated exercise:', JSON.stringify({
+    function: 'updateExercise',
+    parameters: { id, name, type },
+    result: { id: exercise.id },
+  }, null, 2));
+  return exercise;
+}
+
+// Delete an exercise (deletes all associated scores first)
+export async function deleteExercise(id: number) {
+  await ensureInitialized();
+  
+  // Get score count for logging
+  const scoreCount = await prisma.score.count({
+    where: { exerciseId: id },
+  });
+
+  // Delete all scores associated with this exercise first
+  if (scoreCount > 0) {
+    await prisma.score.deleteMany({
+      where: { exerciseId: id },
+    });
+    console.log('[DB] deleteExercise - Deleted', scoreCount, 'score(s) for exercise', id);
+  }
+
+  // Then delete the exercise
+  const exercise = await prisma.exercise.delete({
+    where: { id },
+  });
+  console.log('[DB] deleteExercise - Deleted exercise:', JSON.stringify({
+    function: 'deleteExercise',
+    parameters: { id },
+    result: { id: exercise.id, scoresDeleted: scoreCount },
+  }, null, 2));
+  return exercise;
+}
+
 // Create a score
 export async function createScore(userId: number, exerciseId: number, value: number) {
   await ensureInitialized();
@@ -991,6 +1266,52 @@ export async function createScore(userId: number, exerciseId: number, value: num
       value,
     },
   });
+}
+
+// Delete a score by ID
+export async function deleteScore(scoreId: number) {
+  await ensureInitialized();
+  const score = await prisma.score.delete({
+    where: { id: scoreId },
+  });
+  return score;
+}
+
+// Get all scores for a user with exercise details (for timeline view)
+export async function getUserScoresTimeline(userId: number) {
+  await ensureInitialized();
+  const scores = await prisma.score.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      exercise: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          wing: true,
+        },
+      },
+    },
+  });
+  
+  return scores.map(s => ({
+    id: s.id,
+    value: s.value,
+    createdAt: s.createdAt.toISOString(),
+    exerciseId: s.exerciseId,
+    exerciseName: s.exercise.name,
+    exerciseType: s.exercise.type,
+    userId: s.userId,
+    userName: s.user.name,
+    userWing: s.user.wing,
+  }));
 }
 
 // Create multiple scores (bulk)

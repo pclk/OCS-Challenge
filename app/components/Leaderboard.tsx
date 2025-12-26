@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import SearchableDropdown from './SearchableDropdown';
 import ExerciseIcon from './ExerciseIcon';
 import { useAuth } from './AuthContext';
+import UserScoreTimelineModal from './UserScoreTimelineModal';
 
 interface LeaderboardEntry {
   id: number;
@@ -61,6 +62,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [exercisePages, setExercisePages] = useState<Record<string, number>>({});
+  const [timelineModal, setTimelineModal] = useState<{ userId: number; userName: string; userWing: string | null } | null>(null);
   const itemsPerPage = 10;
   const GOAL_REPS = 20260;
   // Add OCS LEVEL at the beginning for the filter
@@ -502,14 +504,17 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`text-sm ${getRankColorClass(entry.rank || 0)}`}>#{entry.rank}</span>
-                          <span className={`font-medium ${
-                            entry.achieved_goal ? 'text-green-400 font-bold' : 'text-white'
-                          }`}>
+                          <button
+                            onClick={() => setTimelineModal({ userId: entry.user_id, userName: entry.user_name, userWing: entry.wing })}
+                            className={`font-medium hover:text-[#ff7301] transition-colors cursor-pointer ${
+                              entry.achieved_goal ? 'text-green-400 font-bold' : 'text-white'
+                            }`}
+                          >
                             {entry.user_name}
                             {entry.achieved_goal && (
                               <span className="ml-2 text-green-400">✓</span>
                             )}
-                          </span>
+                          </button>
                         </div>
                         <div className="text-white/80 text-sm">
                           {entry.wing || '-'}
@@ -607,13 +612,18 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                           <td className={`py-3 px-4 font-medium ${getRankColorClass(entry.rank || 0)}`}>
                             #{entry.rank}
                           </td>
-                          <td className={`py-3 px-4 font-medium ${
-                            entry.achieved_goal ? 'text-green-400 font-bold' : 'text-white'
-                          }`}>
-                            {entry.user_name}
-                            {entry.achieved_goal && (
-                              <span className="ml-2 text-green-400">✓</span>
-                            )}
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => setTimelineModal({ userId: entry.user_id, userName: entry.user_name, userWing: entry.wing })}
+                              className={`font-medium hover:text-[#ff7301] transition-colors cursor-pointer ${
+                                entry.achieved_goal ? 'text-green-400 font-bold' : 'text-white'
+                              }`}
+                            >
+                              {entry.user_name}
+                              {entry.achieved_goal && (
+                                <span className="ml-2 text-green-400">✓</span>
+                              )}
+                            </button>
                           </td>
                           <td className="py-3 px-4 text-white/80">
                             {entry.wing || '-'}
@@ -757,9 +767,12 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                             {entry.exercise_name}
                           </span>
                         </div>
-                        <div className="text-white text-sm mb-1">
+                        <button
+                          onClick={() => setTimelineModal({ userId: entry.user_id, userName: entry.user_name, userWing: entry.wing })}
+                          className="text-white text-sm mb-1 hover:text-[#ff7301] transition-colors cursor-pointer text-left"
+                        >
                           {getDisplayName(entry)}
-                        </div>
+                        </button>
                       </div>
                       <div className="text-[#ff7301] text-right font-semibold text-lg">
                         {entry.value}
@@ -806,8 +819,13 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                             {entry.exercise_name}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-white">
-                          {getDisplayName(entry)}
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={() => setTimelineModal({ userId: entry.user_id, userName: entry.user_name, userWing: entry.wing })}
+                            className="text-white hover:text-[#ff7301] transition-colors cursor-pointer"
+                          >
+                            {getDisplayName(entry)}
+                          </button>
                         </td>
                         <td className="py-3 px-4 text-white/80">
                           {entry.wing || '-'}
@@ -894,9 +912,12 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className={`text-xs ${getRankColorClass(startIndex + index + 1)}`}>#{startIndex + index + 1}</span>
-                                  <span className="text-white text-sm font-medium">
+                                  <button
+                                    onClick={() => setTimelineModal({ userId: entry.user_id, userName: entry.user_name, userWing: entry.wing })}
+                                    className="text-white text-sm font-medium hover:text-[#ff7301] transition-colors cursor-pointer"
+                                  >
                                     {getDisplayName(entry)}
-                                  </span>
+                                  </button>
                                 </div>
                               </div>
                               <div className="text-[#ff7301] text-right font-semibold text-lg">
@@ -942,8 +963,13 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                                 <td className={`py-3 px-4 font-medium ${getRankColorClass(startIndex + index + 1)}`}>
                                   #{startIndex + index + 1}
                                 </td>
-                                <td className="py-3 px-4 text-white">
-                                  {getDisplayName(entry)}
+                                <td className="py-3 px-4">
+                                  <button
+                                    onClick={() => setTimelineModal({ userId: entry.user_id, userName: entry.user_name, userWing: entry.wing })}
+                                    className="text-white hover:text-[#ff7301] transition-colors cursor-pointer"
+                                  >
+                                    {getDisplayName(entry)}
+                                  </button>
                                 </td>
                                 <td className="py-3 px-4 text-white/80">
                                   {entry.wing || '-'}
@@ -993,6 +1019,17 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
             })
           )}
         </div>
+      )}
+
+      {/* User Score Timeline Modal */}
+      {timelineModal && (
+        <UserScoreTimelineModal
+          isOpen={timelineModal !== null}
+          userId={timelineModal.userId}
+          userName={timelineModal.userName}
+          userWing={timelineModal.userWing}
+          onClose={() => setTimelineModal(null)}
+        />
       )}
     </div>
   );
