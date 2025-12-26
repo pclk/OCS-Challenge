@@ -1095,6 +1095,150 @@ export async function getAccountActions(limit: number = 100, page: number = 1) {
   };
 }
 
+// Create a new report
+export async function createReport(data: {
+  name: string;
+  wing: string;
+  password?: string;
+  type: 'ACCOUNT_CONFLICT' | 'NEW_ACCOUNT_REQUEST';
+  email?: string;
+  phone?: string;
+  notes?: string;
+}) {
+  await ensureInitialized();
+  
+  const report = await prisma.report.create({
+    data: {
+      name: data.name.trim(),
+      wing: data.wing.trim(),
+      password: data.password?.trim() || null,
+      type: data.type,
+      email: data.email?.trim() || null,
+      phone: data.phone?.trim() || null,
+      notes: data.notes?.trim() || null,
+      status: 'PENDING',
+    },
+  });
+  
+  return {
+    id: report.id.toString(),
+    name: report.name,
+    wing: report.wing,
+    password: report.password || '',
+    type: report.type,
+    email: report.email || '',
+    phone: report.phone || '',
+    notes: report.notes || '',
+    status: report.status,
+    timestamp: report.createdAt.getTime(),
+    createdAt: report.createdAt.toISOString(),
+  };
+}
+
+// Get all reports (optionally filtered by wing and status)
+export async function getReports(wing?: string | null, status?: 'PENDING' | 'RESOLVED' | 'DISMISSED') {
+  await ensureInitialized();
+  
+  let whereClause = 'WHERE 1=1';
+  if (wing) {
+    whereClause += ` AND wing = '${wing.replace(/'/g, "''")}'`;
+  }
+  if (status) {
+    whereClause += ` AND status = '${status}'`;
+  }
+  
+  const reports = await prisma.$queryRawUnsafe<Array<{
+    id: number;
+    name: string;
+    wing: string;
+    password: string | null;
+    type: string;
+    email: string | null;
+    phone: string | null;
+    notes: string | null;
+    status: string;
+    resolved_at: Date | null;
+    resolved_by: string | null;
+    created_at: Date;
+  }>>(`
+    SELECT id, name, wing, password, type, email, phone, notes, status, resolved_at, resolved_by, created_at
+    FROM reports
+    ${whereClause}
+    ORDER BY created_at DESC
+  `);
+  
+  return reports.map(report => ({
+    id: report.id.toString(),
+    name: report.name,
+    wing: report.wing,
+    password: report.password || '',
+    type: report.type as 'ACCOUNT_CONFLICT' | 'NEW_ACCOUNT_REQUEST',
+    email: report.email || '',
+    phone: report.phone || '',
+    notes: report.notes || '',
+    status: report.status as 'PENDING' | 'RESOLVED' | 'DISMISSED',
+    resolvedAt: report.resolved_at?.toISOString(),
+    resolvedBy: report.resolved_by,
+    timestamp: report.created_at.getTime(),
+    createdAt: report.created_at.toISOString(),
+  }));
+}
+
+// Update report status (resolve or dismiss)
+export async function updateReportStatus(
+  reportId: number,
+  status: 'RESOLVED' | 'DISMISSED',
+  resolvedBy?: string
+) {
+  await ensureInitialized();
+  
+  const report = await prisma.report.update({
+    where: { id: reportId },
+    data: {
+      status,
+      resolvedAt: new Date(),
+      resolvedBy: resolvedBy || null,
+    },
+  });
+  
+  return {
+    id: report.id.toString(),
+    name: report.name,
+    wing: report.wing,
+    password: report.password || '',
+    type: report.type,
+    email: report.email || '',
+    phone: report.phone || '',
+    notes: report.notes || '',
+    status: report.status,
+    timestamp: report.createdAt.getTime(),
+    createdAt: report.createdAt.toISOString(),
+  };
+}
+
+// Delete a report
+export async function deleteReport(reportId: number) {
+  await ensureInitialized();
+  
+  const report = await prisma.report.delete({
+    where: { id: reportId },
+  });
+  
+  return {
+    id: report.id.toString(),
+    name: report.name,
+    wing: report.wing,
+    password: report.password || '',
+    type: report.type,
+    email: report.email || '',
+    phone: report.phone || '',
+    notes: report.notes || '',
+    status: report.status,
+    timestamp: report.createdAt.getTime(),
+    createdAt: report.createdAt.toISOString(),
+  };
+}
+
 // Get all wings
 export async function getWings() {
   await ensureInitialized();

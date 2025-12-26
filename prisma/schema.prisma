@@ -75,6 +75,37 @@ model AccountAction {
   @@map("account_actions")
 }
 
+model Report {
+  id          Int       @id @default(autoincrement())
+  name        String
+  wing        String
+  password    String?   // Optional, should be hashed if provided
+  type        ReportType
+  email       String?
+  phone       String?
+  notes       String?
+  status      ReportStatus @default(PENDING)
+  resolvedAt  DateTime? @map("resolved_at")
+  resolvedBy  String?   @map("resolved_by") // Admin who resolved it
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([wing])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("reports")
+}
+
 enum ExerciseType {
   rep
+}
+
+enum ReportType {
+  ACCOUNT_CONFLICT
+  NEW_ACCOUNT_REQUEST
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
 }

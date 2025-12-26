@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminLevel } from '@/lib/auth';
-
-// Simple in-memory store for reports (in production, use database)
-const reports: Array<{
-  id: string;
-  name: string;
-  wing: string;
-  password: string;
-  type: 'ACCOUNT_CONFLICT' | 'NEW_ACCOUNT_REQUEST';
-  email?: string;
-  phone?: string;
-  notes?: string;
-  timestamp: number;
-}> = [];
+import { getAdminLevel, getWingFromPassword } from '@/lib/auth';
+import { createReport, getReports, deleteReport } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,25 +29,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store report
-    const report = {
-      id: Date.now().toString() + Math.random().toString(36).substring(7),
-      name: name.trim(),
-      wing: wing.trim(),
-      password: password?.trim() || '', // Optional - In production, hash this before storing if provided
+    // Store report in database
+    const report = await createReport({
+      name,
+      wing,
+      password,
       type: type as 'ACCOUNT_CONFLICT' | 'NEW_ACCOUNT_REQUEST',
-      email: email?.trim() || '',
-      phone: phone?.trim() || '',
-      notes: notes?.trim() || '',
-      timestamp: Date.now(),
-    };
-
-    reports.push(report);
-
-    // Keep only last 100 reports
-    if (reports.length > 100) {
-      reports.shift();
-    }
+      email,
+      phone,
+      notes,
+    });
 
     console.log('[API] POST /api/auth/report-existing - Report received:', {
       ...report,
@@ -80,10 +59,31 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  // Return reports (for admin use)
-  return NextResponse.json({
-    reports: reports.sort((a, b) => b.timestamp - a.timestamp),
-  });
+  try {
+    // Optionally filter by wing if admin is wing-level
+    const authHeader = request.headers.get('authorization');
+    let wing: string | null = null;
+    
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const adminLevel = getAdminLevel(token);
+      if (adminLevel === 'WING') {
+        wing = getWingFromPassword(token);
+      }
+    }
+
+    const reports = await getReports(wing);
+    
+    return NextResponse.json({
+      reports: reports,
+    });
+  } catch (error: any) {
+    console.error('[API] GET /api/auth/report-existing - Error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch reports', details: error?.message || 'Unknown error' },
+      { status: 500 }
+    );
+  }
 }
 
 export async function DELETE(request: NextRequest) {
@@ -115,15 +115,16 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const index = reports.findIndex(r => r.id === reportId);
-    if (index === -1) {
+    // Convert string ID to number
+    const id = parseInt(reportId, 10);
+    if (isNaN(id)) {
       return NextResponse.json(
-        { error: 'Report not found' },
-        { status: 404 }
+        { error: 'Invalid reportId' },
+        { status: 400 }
       );
     }
 
-    reports.splice(index, 1);
+    await deleteReport(id);
 
     return NextResponse.json({
       success: true,
@@ -131,6 +132,15 @@ export async function DELETE(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[API] DELETE /api/auth/report-existing - Error:', error);
+    
+    // Handle Prisma not found error
+    if (error?.code === 'P2025') {
+      return NextResponse.json(
+        { error: 'Report not found' },
+        { status: 404 }
+      );
+    }
+    
     return NextResponse.json(
       { error: 'Failed to dismiss report', details: error?.message || 'Unknown error' },
       { status: 500 }

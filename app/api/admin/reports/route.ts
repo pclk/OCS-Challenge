@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminPassword, getAdminLevel, getWingFromPassword } from '@/lib/auth';
+import { getAdminLevel, getWingFromPassword } from '@/lib/auth';
+import { getReports } from '@/lib/db';
 
 async function verifyAdmin(request: NextRequest): Promise<{ isAdmin: boolean; wing?: string | null }> {
   const authHeader = request.headers.get('authorization');
@@ -26,35 +27,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch reports from the report-existing endpoint
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    // Fetch reports directly from database
+    // Wing admins only see reports from their wing
+    const reports = await getReports(adminWing || null);
     
-    try {
-      const response = await fetch(`${baseUrl}/api/auth/report-existing`);
-      const data = await response.json();
-      const allReports = data.reports || [];
-      
-      // Filter by wing if wing admin
-      let filteredReports = allReports;
-      if (adminWing) {
-        filteredReports = allReports.filter((r: any) => {
-          const reportWing = (r.wing || '').trim();
-          return reportWing.toLowerCase() === adminWing.toLowerCase();
-        });
-      }
-      
-      return NextResponse.json({
-        success: true,
-        reports: filteredReports,
-      });
-    } catch (error) {
-      // If fetch fails, return empty array
-      return NextResponse.json({
-        success: true,
-        reports: [],
-      });
-    }
+    return NextResponse.json({
+      success: true,
+      reports: reports,
+    });
   } catch (error: any) {
     console.error('[API] GET /api/admin/reports - Error:', error);
     return NextResponse.json(
