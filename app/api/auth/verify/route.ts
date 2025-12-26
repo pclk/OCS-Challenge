@@ -23,12 +23,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user from database to ensure still exists and is approved
+    // Get user from database to ensure still exists
     const user = await getUserById(payload.userId);
 
-    if (!user || (!user.approved && user.pendingApproval)) {
+    if (!user) {
       return NextResponse.json(
-        { error: 'User not found or not approved' },
+        { error: 'User not found' },
         { status: 401 }
       );
     }
@@ -39,7 +39,6 @@ export async function GET(request: NextRequest) {
         id: user.id,
         name: user.name,
         wing: user.wing,
-        approved: user.approved,
       },
     });
   } catch (error: any) {

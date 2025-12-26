@@ -10,9 +10,8 @@ interface EditUserModalProps {
     name: string;
     wing: string;
     password: string;
-    approved: boolean;
   };
-  onFormChange: (data: { name: string; wing: string; password: string; approved: boolean }) => void;
+  onFormChange: (data: { name: string; wing: string; password: string }) => void;
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
@@ -84,16 +83,6 @@ export default function EditUserModal({
                 onChange={(e) => onFormChange({ ...formData, password: e.target.value })}
                 className="w-full px-3 py-2 border border-white/20 rounded-md bg-black text-white"
               />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="approved"
-                checked={formData.approved}
-                onChange={(e) => onFormChange({ ...formData, approved: e.target.checked })}
-                className="w-4 h-4 accent-[#ff7301]"
-              />
-              <label htmlFor="approved" className="text-white">Approved</label>
             </div>
             <div className="flex gap-3 justify-end mt-6">
               <button

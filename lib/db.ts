@@ -116,7 +116,7 @@ export async function initDatabase() {
       console.log('[DB] initDatabase - Exercises data already exists (count: ' + existingExercisesCount + '), skipping CSV load and insertion');
     }
 
-    // Only load and insert name-wing mappings if table is empty
+    // Load and insert name-wing mappings and create users from personnel.csv
     if (existingMappingsCount === 0) {
       const personnelPath = path.join(process.cwd(), 'data', 'personnel.csv');
       const personnel = parseCSV<{ name: string; wing: string }>(personnelPath);
@@ -126,8 +126,10 @@ export async function initDatabase() {
         .filter(p => p.name && p.wing)
         .map(p => ({ name: p.name, wing: p.wing }));
       
+      let usersCreated = 0;
       for (const person of validPersonnel) {
         try {
+          // Create in NameRankMapping for dropdowns
           await prisma.nameRankMapping.create({
             data: {
               name: person.name,
@@ -135,6 +137,21 @@ export async function initDatabase() {
             } as any
           });
           mappingsInserted++;
+          
+          // Also create user in users table if it doesn't exist
+          const existingUser = await prisma.$queryRaw<Array<{ id: number }>>`
+            SELECT id FROM users WHERE name = ${person.name} AND wing = ${person.wing} LIMIT 1
+          `;
+          
+          if (existingUser.length === 0) {
+            await prisma.user.create({
+              data: {
+                name: person.name,
+                wing: person.wing,
+              },
+            });
+            usersCreated++;
+          }
         } catch (error: any) {
           // Ignore unique constraint errors
           if (error.code !== 'P2002') {
@@ -142,13 +159,40 @@ export async function initDatabase() {
           }
         }
       }
-      console.log('[DB] initDatabase - Inserted name-wing mappings:', JSON.stringify({
+      console.log('[DB] initDatabase - Inserted name-wing mappings and users:', JSON.stringify({
         total: validPersonnel.length,
-        inserted: mappingsInserted,
+        mappingsInserted: mappingsInserted,
+        usersCreated: usersCreated,
         skipped: validPersonnel.length - mappingsInserted
       }, null, 2));
     } else {
-      console.log('[DB] initDatabase - Name-wing mappings data already exists (count: ' + existingMappingsCount + '), skipping CSV load and insertion');
+      console.log('[DB] initDatabase - Name-wing mappings data already exists (count: ' + existingMappingsCount + '), ensuring users exist for all mappings');
+      // Ensure users exist for all NameRankMapping entries
+      const allMappings = await prisma.nameRankMapping.findMany();
+      let usersSynced = 0;
+      for (const mapping of allMappings) {
+        const existingUser = await prisma.$queryRaw<Array<{ id: number }>>`
+          SELECT id FROM users WHERE name = ${mapping.name} AND wing = ${mapping.wing} LIMIT 1
+        `;
+        if (existingUser.length === 0) {
+          try {
+            await prisma.user.create({
+              data: {
+                name: mapping.name,
+                wing: mapping.wing,
+              },
+            });
+            usersSynced++;
+          } catch (error: any) {
+            if (error.code !== 'P2002') {
+              console.warn(`[DB] initDatabase - Could not create user for ${mapping.name}/${mapping.wing}:`, error.message);
+            }
+          }
+        }
+      }
+      if (usersSynced > 0) {
+        console.log('[DB] initDatabase - Synced users from existing mappings:', usersSynced);
+      }
     }
 
     const duration = Date.now() - startTime;
@@ -229,6 +273,15 @@ async function ensureInitialized() {
     await initPromise;
     console.log('[DB] ensureInitialized - Database initialization finished, proceeding');
   } else {
+    // Even if initialized, ensure has_logged_in column exists (for migrations)
+    try {
+      await prisma.$executeRaw`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS has_logged_in BOOLEAN NOT NULL DEFAULT false;
+      `;
+    } catch (error: any) {
+      // Ignore errors (column might already exist or other issues)
+      console.log('[DB] ensureInitialized - Column check (non-blocking):', error.message);
+    }
     console.log('[DB] ensureInitialized - Database already initialized, skipping');
   }
 }
@@ -325,20 +378,18 @@ export async function registerUser(
   // Hash password
   const hashedPassword = hashPassword(password);
 
-  // If user exists but has no password, update them and auto-approve
+  // If user exists but has no password, update them
   if (existingUserResult.length > 0) {
     const userId = existingUserResult[0].id;
     const updateResult = await prisma.$queryRaw<Array<{
       id: number;
       name: string;
       wing: string | null;
-      approved: boolean;
-      pending_approval: boolean;
     }>>`
       UPDATE users
-      SET password = ${hashedPassword}, approved = true, pending_approval = false, has_logged_in = true
+      SET password = ${hashedPassword}, has_logged_in = true
       WHERE id = ${userId}
-      RETURNING id, name, wing, approved, pending_approval
+      RETURNING id, name, wing
     `;
 
     const user = updateResult[0];
@@ -346,23 +397,18 @@ export async function registerUser(
       id: user.id,
       name: user.name,
       wing: user.wing,
-      approved: user.approved,
-      pendingApproval: user.pending_approval,
     };
   }
 
-  // Auto-approve all new users
   // Create new user using raw SQL to avoid Prisma type issues
   const insertResult = await prisma.$queryRaw<Array<{
     id: number;
     name: string;
     wing: string | null;
-    approved: boolean;
-    pending_approval: boolean;
   }>>`
-    INSERT INTO users (name, wing, password, approved, pending_approval, has_logged_in, created_at)
-    VALUES (${name}, ${wing}, ${hashedPassword}, true, false, true, NOW())
-    RETURNING id, name, wing, approved, pending_approval
+    INSERT INTO users (name, wing, password, has_logged_in, created_at)
+    VALUES (${name}, ${wing}, ${hashedPassword}, true, NOW())
+    RETURNING id, name, wing
   `;
 
   const user = insertResult[0];
@@ -371,8 +417,6 @@ export async function registerUser(
     id: user.id,
     name: user.name,
     wing: user.wing,
-    approved: user.approved,
-    pendingApproval: user.pending_approval,
   };
 }
 
@@ -436,27 +480,26 @@ export async function checkUserExistsWithPassword(
   };
 }
 
-// Set password for existing user and auto-approve
+// Set password for existing user
 export async function setUserPassword(
   userId: number,
   password: string
-): Promise<{ id: number; name: string; wing: string | null; approved: boolean }> {
+): Promise<{ id: number; name: string; wing: string | null }> {
   await ensureInitialized();
 
   // Hash password
   const hashedPassword = hashPassword(password);
 
-  // Update user with password and auto-approve using raw SQL
+  // Update user with password using raw SQL
   const updateResult = await prisma.$queryRaw<Array<{
     id: number;
     name: string;
     wing: string | null;
-    approved: boolean;
   }>>`
     UPDATE users
-    SET password = ${hashedPassword}, approved = true, pending_approval = false
+    SET password = ${hashedPassword}
     WHERE id = ${userId}
-    RETURNING id, name, wing, approved
+    RETURNING id, name, wing
   `;
 
   const user = updateResult[0];
@@ -465,7 +508,6 @@ export async function setUserPassword(
     id: user.id,
     name: user.name,
     wing: user.wing,
-    approved: user.approved,
   };
 }
 
@@ -474,7 +516,7 @@ export async function authenticateUser(
   name: string,
   wing: string,
   password: string
-): Promise<{ id: number; name: string; wing: string | null; approved: boolean } | null> {
+): Promise<{ id: number; name: string; wing: string | null } | null> {
   await ensureInitialized();
 
   const userResult = await prisma.$queryRaw<Array<{
@@ -482,10 +524,8 @@ export async function authenticateUser(
     name: string;
     wing: string | null;
     password: string | null;
-    approved: boolean;
-    pending_approval: boolean;
   }>>`
-    SELECT id, name, wing, password, approved, pending_approval
+    SELECT id, name, wing, password
     FROM users
     WHERE name = ${name} AND wing = ${wing}
     LIMIT 1
@@ -502,20 +542,6 @@ export async function authenticateUser(
     return null;
   }
 
-  // Only allow login if approved (or from personnel CSV - which should be approved)
-  if (!user.approved && !user.pending_approval) {
-    // Check if in personnel CSV as fallback
-    const isFromPersonnel = await isInPersonnelCSV(name, wing);
-    if (!isFromPersonnel) {
-      return null; // Not approved and not in personnel CSV
-    }
-  }
-
-  // If pending approval, don't allow login yet
-  if (user.pending_approval && !user.approved) {
-    return null;
-  }
-
   // Mark user as having logged in
   await prisma.$executeRaw`
     UPDATE users
@@ -527,7 +553,6 @@ export async function authenticateUser(
     id: user.id,
     name: user.name,
     wing: user.wing,
-    approved: user.approved,
   };
 }
 
@@ -538,10 +563,8 @@ export async function getUserById(id: number) {
     id: number;
     name: string;
     wing: string | null;
-    approved: boolean;
-    pending_approval: boolean;
   }>>`
-    SELECT id, name, wing, approved, pending_approval
+    SELECT id, name, wing
     FROM users
     WHERE id = ${id}
     LIMIT 1
@@ -556,56 +579,49 @@ export async function getUserById(id: number) {
     id: user.id,
     name: user.name,
     wing: user.wing,
-    approved: user.approved,
-    pendingApproval: user.pending_approval,
   };
 }
 
-// Get pending approvals
+// Get pending approvals (deprecated - returns empty array since approval is no longer needed)
 export async function getPendingApprovals(wing?: string) {
   await ensureInitialized();
-  let query = `
-    SELECT id, name, wing, created_at
-    FROM users
-    WHERE pending_approval = true AND approved = false
-  `;
-  
-  if (wing) {
-    query += ` AND wing = '${wing.replace(/'/g, "''")}'`;
-  }
-  
-  query += ` ORDER BY created_at ASC`;
-  
-  const users = await prisma.$queryRawUnsafe<Array<{
-    id: number;
-    name: string;
-    wing: string | null;
-    created_at: Date;
-  }>>(query);
-  
-  return users.map(user => ({
-    id: user.id,
-    name: user.name,
-    wing: user.wing,
-    createdAt: user.created_at,
-  }));
+  // Return empty array since approval is no longer needed
+  return [];
 }
 
-// Approve a user
+// Approve a user (deprecated - no longer needed, kept for API compatibility)
 export async function approveUser(userId: number) {
   await ensureInitialized();
-  await prisma.$executeRaw`
-    UPDATE users
-    SET approved = true, pending_approval = false
-    WHERE id = ${userId}
-  `;
+  // No-op: approval is no longer needed, all users are automatically "approved"
 }
 
 // Reject a user (delete the account)
 export async function rejectUser(userId: number) {
   await ensureInitialized();
+  // Get user info before deletion to remove from NameRankMapping
+  const user = await getUserById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  
   // Delete all scores first (foreign key constraint)
   await prisma.$executeRaw`DELETE FROM scores WHERE user_id = ${userId}`;
+  
+  // Delete from NameRankMapping if user has name and wing
+  if (user.name && user.wing) {
+    try {
+      await prisma.nameRankMapping.deleteMany({
+        where: {
+          name: user.name,
+          wing: user.wing,
+        },
+      });
+    } catch (error: any) {
+      // Ignore errors if mapping doesn't exist
+      console.log('[DB] rejectUser - Could not delete name mapping:', error.message);
+    }
+  }
+  
   // Then delete the user
   await prisma.user.delete({
     where: { id: userId },
@@ -619,11 +635,9 @@ export async function getAllUsers() {
     id: number;
     name: string;
     wing: string | null;
-    approved: boolean;
-    pending_approval: boolean;
     created_at: Date;
   }>>`
-    SELECT id, name, wing, approved, pending_approval, created_at
+    SELECT id, name, wing, created_at
     FROM users
     ORDER BY created_at DESC
   `;
@@ -632,8 +646,6 @@ export async function getAllUsers() {
     id: user.id,
     name: user.name,
     wing: user.wing,
-    approved: user.approved,
-    pendingApproval: user.pending_approval,
     createdAt: user.created_at,
   }));
 }
@@ -666,12 +678,10 @@ export async function getUsersPaginated(
     id: number;
     name: string;
     wing: string | null;
-    approved: boolean;
-    pending_approval: boolean;
     has_logged_in: boolean;
     created_at: Date;
   }>>(`
-    SELECT id, name, wing, approved, pending_approval, has_logged_in, created_at
+    SELECT id, name, wing, has_logged_in, created_at
     FROM users
     ${whereClause}
     ORDER BY created_at DESC
@@ -691,9 +701,7 @@ export async function getUsersPaginated(
       id: user.id,
       name: user.name,
       wing: user.wing,
-      approved: user.approved,
-      pendingApproval: user.pending_approval,
-      hasLoggedIn: user.has_logged_in,
+      hasLoggedIn: user.has_logged_in ?? false,
       createdAt: user.created_at,
     })),
     pagination: {
@@ -711,7 +719,7 @@ export async function getUsersWithConflicts(wing?: string) {
   await ensureInitialized();
   
   let query = `
-    SELECT DISTINCT u1.id, u1.name, u1.wing, u1.approved, u1.pending_approval, u1.created_at,
+    SELECT DISTINCT u1.id, u1.name, u1.wing, u1.created_at,
            COUNT(DISTINCT u2.id) as conflict_count
     FROM users u1
     LEFT JOIN users u2 ON u1.name = u2.name AND (u1.wing != u2.wing OR (u1.wing IS NULL AND u2.wing IS NOT NULL) OR (u1.wing IS NOT NULL AND u2.wing IS NULL))
@@ -725,7 +733,7 @@ export async function getUsersWithConflicts(wing?: string) {
   }
   
   query += `
-    GROUP BY u1.id, u1.name, u1.wing, u1.approved, u1.pending_approval, u1.created_at
+    GROUP BY u1.id, u1.name, u1.wing, u1.created_at
     HAVING COUNT(DISTINCT u2.id) > 0 OR u1.wing IS NULL
     ORDER BY u1.created_at DESC
   `;
@@ -734,8 +742,6 @@ export async function getUsersWithConflicts(wing?: string) {
     id: number;
     name: string;
     wing: string | null;
-    approved: boolean;
-    pending_approval: boolean;
     created_at: Date;
     conflict_count: bigint;
   }>>(query);
@@ -744,8 +750,6 @@ export async function getUsersWithConflicts(wing?: string) {
     id: conflict.id,
     name: conflict.name,
     wing: conflict.wing,
-    approved: conflict.approved,
-    pendingApproval: conflict.pending_approval,
     createdAt: conflict.created_at,
     conflictCount: Number(conflict.conflict_count),
   }));
@@ -769,6 +773,21 @@ export async function resolveConflictByMerge(targetUserId: number, sourceUserId:
     SET user_id = ${targetUserId}
     WHERE user_id = ${sourceUserId}
   `);
+  
+  // Delete from NameRankMapping if source user has name and wing
+  if (sourceUser.name && sourceUser.wing) {
+    try {
+      await prisma.nameRankMapping.deleteMany({
+        where: {
+          name: sourceUser.name,
+          wing: sourceUser.wing,
+        },
+      });
+    } catch (error: any) {
+      // Ignore errors if mapping doesn't exist
+      console.log('[DB] resolveConflictByMerge - Could not delete name mapping:', error.message);
+    }
+  }
   
   // Delete source user
   await prisma.$executeRawUnsafe(`
@@ -805,8 +824,6 @@ export async function bulkUpsertUsers(users: Array<{ name: string; wing: string 
             data: {
               name: user.name,
               wing: user.wing,
-              approved: true,
-              pendingApproval: false,
             },
           });
           results.created++;
@@ -852,7 +869,7 @@ export async function createUser(
   name: string,
   wing: string | null,
   password?: string
-): Promise<{ id: number; name: string; wing: string | null; approved: boolean; pendingApproval: boolean }> {
+): Promise<{ id: number; name: string; wing: string | null }> {
   await ensureInitialized();
   
   // Check if user already exists
@@ -873,12 +890,10 @@ export async function createUser(
     id: number;
     name: string;
     wing: string | null;
-    approved: boolean;
-    pending_approval: boolean;
   }>>`
-    INSERT INTO users (name, wing, password, approved, pending_approval, created_at)
-    VALUES (${name}, ${wing}, ${hashedPassword}, true, false, NOW())
-    RETURNING id, name, wing, approved, pending_approval
+    INSERT INTO users (name, wing, password, created_at)
+    VALUES (${name}, ${wing}, ${hashedPassword}, NOW())
+    RETURNING id, name, wing
   `;
 
   const user = insertResult[0];
@@ -886,16 +901,14 @@ export async function createUser(
     id: user.id,
     name: user.name,
     wing: user.wing,
-    approved: user.approved,
-    pendingApproval: user.pending_approval,
   };
 }
 
 // Update a user (admin function)
 export async function updateUser(
   userId: number,
-  updates: { name?: string; wing?: string | null; password?: string; approved?: boolean }
-): Promise<{ id: number; name: string; wing: string | null; approved: boolean; pendingApproval: boolean }> {
+  updates: { name?: string; wing?: string | null; password?: string }
+): Promise<{ id: number; name: string; wing: string | null }> {
   await ensureInitialized();
   
   // Build update object for Prisma
@@ -913,13 +926,6 @@ export async function updateUser(
     updateData.password = updates.password ? hashPassword(updates.password) : null;
   }
   
-  if (updates.approved !== undefined) {
-    updateData.approved = updates.approved;
-    if (updates.approved) {
-      updateData.pendingApproval = false;
-    }
-  }
-  
   if (Object.keys(updateData).length === 0) {
     // No updates, just return the user
     const user = await getUserById(userId);
@@ -930,8 +936,6 @@ export async function updateUser(
       id: user.id,
       name: user.name,
       wing: user.wing,
-      approved: user.approved,
-      pendingApproval: user.pendingApproval,
     };
   }
   
@@ -963,16 +967,6 @@ export async function updateUser(
       paramIndex++;
     }
   }
-  if (updateData.approved !== undefined) {
-    setParts.push(`approved = $${paramIndex}`);
-    params.push(updateData.approved);
-    paramIndex++;
-  }
-  if (updateData.pendingApproval !== undefined) {
-    setParts.push(`pending_approval = $${paramIndex}`);
-    params.push(updateData.pendingApproval);
-    paramIndex++;
-  }
   
   params.push(userId);
   
@@ -980,15 +974,13 @@ export async function updateUser(
     UPDATE users
     SET ${setParts.join(', ')}
     WHERE id = $${paramIndex}
-    RETURNING id, name, wing, approved, pending_approval
+    RETURNING id, name, wing
   `;
   
   const updateResult = await prisma.$queryRawUnsafe<Array<{
     id: number;
     name: string;
     wing: string | null;
-    approved: boolean;
-    pending_approval: boolean;
   }>>(query, ...params);
 
   if (updateResult.length === 0) {
@@ -1000,8 +992,6 @@ export async function updateUser(
     id: user.id,
     name: user.name,
     wing: user.wing,
-    approved: user.approved,
-    pendingApproval: user.pending_approval,
   };
 }
 
@@ -1016,6 +1006,22 @@ export async function deleteUserAccount(userId: number) {
   
   // Delete all scores first (foreign key constraint)
   await prisma.$executeRaw`DELETE FROM scores WHERE user_id = ${userId}`;
+  
+  // Delete from NameRankMapping if user has name and wing
+  if (user.name && user.wing) {
+    try {
+      await prisma.nameRankMapping.deleteMany({
+        where: {
+          name: user.name,
+          wing: user.wing,
+        },
+      });
+    } catch (error: any) {
+      // Ignore errors if mapping doesn't exist
+      console.log('[DB] deleteUserAccount - Could not delete name mapping:', error.message);
+    }
+  }
+  
   // Then delete the user
   await prisma.user.delete({
     where: { id: userId },
@@ -1116,14 +1122,14 @@ export async function getWingsByName(name?: string | null) {
     return [];
   }
   await ensureInitialized();
-  const mappings = await prisma.nameRankMapping.findMany({
-    where: { name },
-    select: { wing: true },
-    distinct: ['wing'],
-    orderBy: { wing: 'asc' },
-  });
-  const wings = mappings.map((m: { wing: string }) => ({ wing: m.wing }));
-  console.log('[DB] getWingsByName - Retrieved wings:', JSON.stringify({
+  const users = await prisma.$queryRaw<Array<{ wing: string | null }>>`
+    SELECT DISTINCT wing
+    FROM users
+    WHERE name = ${name} AND wing IS NOT NULL
+    ORDER BY wing ASC
+  `;
+  const wings = users.map((u: { wing: string | null }) => ({ wing: u.wing! }));
+  console.log('[DB] getWingsByName - Retrieved wings from users table:', JSON.stringify({
     function: 'getWingsByName',
     parameters: { name },
     result: { count: wings.length },
@@ -1132,16 +1138,17 @@ export async function getWingsByName(name?: string | null) {
   return wings;
 }
 
-// Get all names
+// Get all names from users table
 export async function getAllNames() {
   await ensureInitialized();
-  const mappings = await prisma.nameRankMapping.findMany({
-    select: { name: true },
-    distinct: ['name'],
-    orderBy: { name: 'asc' },
-  });
-  const names = mappings.map((m: { name: string }) => ({ name: m.name }));
-  console.log('[DB] getAllNames - Retrieved names:', JSON.stringify({
+  const users = await prisma.$queryRaw<Array<{ name: string }>>`
+    SELECT DISTINCT name
+    FROM users
+    WHERE name IS NOT NULL
+    ORDER BY name ASC
+  `;
+  const names = users.map((u: { name: string }) => ({ name: u.name }));
+  console.log('[DB] getAllNames - Retrieved names from users table:', JSON.stringify({
     function: 'getAllNames',
     parameters: {},
     result: { count: names.length },
@@ -1150,7 +1157,7 @@ export async function getAllNames() {
   return names;
 }
 
-// Get user info (wing) by name (returns first match if multiple exist)
+// Get user info (wing) by name from users table (returns first match if multiple exist)
 export async function getUserInfoByName(name: string) {
   console.log('[DB] getUserInfoByName - Called with name:', name);
   if (!name) {
@@ -1165,11 +1172,9 @@ export async function getUserInfoByName(name: string) {
   await ensureInitialized();
     console.log('[DB] getUserInfoByName - Database initialized, executing raw SQL query');
     
-    // Use raw SQL query to avoid Prisma adapter issues with the model name containing "rank"
-    // The model name "NameRankMapping" might be causing Prisma to generate incorrect SQL with RANK()
-    const result = await prisma.$queryRaw<Array<{ wing: string }>>`
+    const result = await prisma.$queryRaw<Array<{ wing: string | null }>>`
       SELECT wing 
-      FROM name_rank_mappings 
+      FROM users 
       WHERE name = ${name}
       LIMIT 1
     `;
@@ -1179,8 +1184,8 @@ export async function getUserInfoByName(name: string) {
       firstResult: result[0] || null
     });
     
-    const mapping = result[0] || null;
-    const userInfo = mapping ? { wing: mapping.wing } : null;
+    const user = result[0] || null;
+    const userInfo = user && user.wing ? { wing: user.wing } : null;
     console.log('[DB] getUserInfoByName - Retrieved user info:', JSON.stringify({
       function: 'getUserInfoByName',
       parameters: { name },

@@ -127,7 +127,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userId, name, wing, password, approved } = body;
+    const { userId, name, wing, password } = body;
 
     if (!userId || typeof userId !== 'number') {
       return NextResponse.json(
@@ -167,7 +167,6 @@ export async function PUT(request: NextRequest) {
       updates.wing = adminWing || wing;
     }
     if (password !== undefined) updates.password = password;
-    if (approved !== undefined) updates.approved = approved;
 
     const user = await updateUser(userId, updates);
     return NextResponse.json({

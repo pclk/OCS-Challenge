@@ -50,13 +50,9 @@ export async function POST(request: NextRequest) {
           id: user.id,
           name: user.name,
           wing: user.wing,
-          approved: user.approved,
-          pendingApproval: user.pendingApproval,
         },
         token,
-        message: user.approved
-          ? 'Account created successfully!'
-          : 'Account created and pending admin approval.',
+        message: 'Account created successfully!',
       });
     } catch (error: any) {
       if (error.message === 'User already exists') {

@@ -40,8 +40,6 @@ export async function GET(request: NextRequest) {
         id: c.id,
         name: c.name,
         wing: c.wing,
-        approved: c.approved,
-        pendingApproval: c.pendingApproval,
         createdAt: c.createdAt,
         conflictCount: c.conflictCount,
       })),

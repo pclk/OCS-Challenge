@@ -15,8 +15,6 @@ interface User {
   id: number;
   name: string;
   wing: string | null;
-  approved: boolean;
-  pendingApproval: boolean;
   hasLoggedIn?: boolean;
   createdAt: string | Date;
 }
@@ -57,7 +55,7 @@ export default function AdminPanel() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [createForm, setCreateForm] = useState({ name: '', wing: '', password: '' });
-  const [editForm, setEditForm] = useState({ name: '', wing: '', password: '', approved: false });
+  const [editForm, setEditForm] = useState({ name: '', wing: '', password: '' });
 
   // Exercise management (OCS only)
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -336,14 +334,13 @@ export default function AdminPanel() {
           name: editForm.name,
           wing: adminLevel === 'OCS' ? (editForm.wing || null) : adminWing,
           password: editForm.password || undefined,
-          approved: editForm.approved,
         }),
       });
       const data = await response.json();
       if (response.ok && data.success) {
         toast.success('User updated successfully');
         setEditingUser(null);
-        setEditForm({ name: '', wing: '', password: '', approved: false });
+        setEditForm({ name: '', wing: '', password: '' });
         fetchUsers(adminToken, userPage, userSearch);
       } else {
         toast.error(data.error || 'Failed to update user');
@@ -806,25 +803,18 @@ export default function AdminPanel() {
                     <p className="text-white font-semibold">{user.name}</p>
                     <p className="text-white/70 text-sm">Wing: {user.wing || 'N/A'}</p>
                     <p className="text-white/50 text-xs">Created: {new Date(user.createdAt).toLocaleString()}</p>
-                    <div className="flex gap-2 mt-2 flex-wrap">
-                      <span className={`text-xs px-2 py-1 rounded inline-block ${
-                        user.approved ? 'bg-green-600/20 text-green-400' : 'bg-yellow-600/20 text-yellow-400'
-                      }`}>
-                        {user.approved ? 'Approved' : user.pendingApproval ? 'Pending' : 'Not Approved'}
-                      </span>
-                      <span className={`text-xs px-2 py-1 rounded inline-block ${
-                        user.hasLoggedIn ? 'bg-blue-600/20 text-blue-400' : 'bg-gray-600/20 text-gray-400'
-                      }`}>
-                        {user.hasLoggedIn ? 'Logged In' : 'Not Logged In'}
-                      </span>
-                    </div>
+                    <span className={`text-xs px-2 py-1 rounded mt-2 inline-block ${
+                      user.hasLoggedIn ? 'bg-blue-600/20 text-blue-400' : 'bg-gray-600/20 text-gray-400'
+                    }`}>
+                      {user.hasLoggedIn ? 'Logged In' : 'Not Logged In'}
+                    </span>
                   </div>
                   {(adminLevel === 'OCS' || adminLevel === 'WING') && (
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
                           setEditingUser(user);
-                          setEditForm({ name: user.name, wing: user.wing || '', password: '', approved: user.approved });
+                          setEditForm({ name: user.name, wing: user.wing || '', password: '' });
                         }}
                         disabled={loading}
                         className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
@@ -1126,7 +1116,7 @@ export default function AdminPanel() {
         onConfirm={handleUpdateUser}
         onCancel={() => {
           setEditingUser(null);
-          setEditForm({ name: '', wing: '', password: '', approved: false });
+          setEditForm({ name: '', wing: '', password: '' });
         }}
         loading={loading}
       />

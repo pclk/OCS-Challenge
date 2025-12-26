@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'User approved successfully',
+      message: 'User updated (approval no longer required)',
     });
   } catch (error: any) {
     console.error('[API] POST /api/admin/approve-user - Error:', error);

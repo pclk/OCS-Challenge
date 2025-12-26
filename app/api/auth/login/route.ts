@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Invalid credentials or account pending approval' },
+        { error: 'Invalid credentials' },
         { status: 401 }
       );
     }
@@ -78,7 +78,6 @@ export async function POST(request: NextRequest) {
         id: user.id,
         name: user.name,
         wing: user.wing,
-        approved: user.approved,
       },
       token,
     });

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Set password and auto-approve
+    // Set password
     const user = await setUserPassword(userId, password);
 
     // Generate session token
@@ -41,7 +41,6 @@ export async function POST(request: NextRequest) {
         id: user.id,
         name: user.name,
         wing: user.wing,
-        approved: user.approved,
       },
       token,
       message: 'Password created successfully! You are now logged in.',

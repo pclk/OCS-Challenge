@@ -13,14 +13,14 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    const mappings = await prisma.nameRankMapping.findMany({
-      where: { wing },
-      select: { name: true },
-      distinct: ['name'],
-      orderBy: { name: 'asc' },
-    });
+    const users = await prisma.$queryRaw<Array<{ name: string }>>`
+      SELECT DISTINCT name
+      FROM users
+      WHERE wing = ${wing} AND name IS NOT NULL
+      ORDER BY name ASC
+    `;
     
-    return NextResponse.json(mappings.map(m => m.name));
+    return NextResponse.json(users.map(u => u.name));
   } catch (error) {
     console.error('Error fetching names by wing:', error);
     return NextResponse.json(

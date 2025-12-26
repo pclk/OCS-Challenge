@@ -54,9 +54,9 @@ Let's create a csv through Google Sheets.
 [input the name column] Let's have the name column. Starting from this column, let's create names. 
 
 [
-    "Bryan Lim"
-    "Myan Ra"
-    "Jeff"
+    "JEFF BEZOS"
+    "ELON MUSK"
+    "LEE CHONG WEI"
 ]
 
 Let's download the csv. [Files > Download > .csv] Click on Files, Download, then .csv.
@@ -115,44 +115,119 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 
 ## Recording Instructions
 
-1. Prep: Delete user Siew Wei Heng
-2. Prep: Logout admin panel
-3. Register user: Name: Siew Wei Heng, Wing: DIS Wing, Password: weiheng
-4. Close the website
-5. Reopen the website
-6. Click icon (user settings at top right)
-7. Close (user settings modal)
-8. Click on a user (in leaderboard)
-9. Close (user score timeline modal)
-10. Open inspect element and set mobile setting
-11. Enter exercises: Burpees: 20, Pushups: 20
-12. Exit mobile setting
-13. Go to admin panel
-14. Admin login: Password: Wm1qIhpmiJlhb2Qe71D0OD4nbbKMCnae
-15. Click Nominal Rolls (button)
-16. Click ? (question mark help button)
-17. Go to sheets.google.com
-18. Input the name column (in Google Sheets)
-19. Google Sheets names: "JEFF BEZOS", "ELON MUSK", "LEE CHONG WEI"
-20. Files > Download > .csv
-21. Go to webapp
-22. Upload (the CSV file)
-23. Click on Create (user button)
-24. Close (create user modal)
-25. Go to user registration (page)
-26. Register (not found): Name: damien
-27. Click report (button)
-28. Submit report
-29. Submit the report
-30. Go to admin view
-31. Click ? next to Reports
-32. Click ? next to type (hover over question mark)
-33. Click Create Account (button)
-34. Go to register page
-35. Register (conflict): Name: SIEW WEI HENG, Wing: DIS WING, Password: lmao
-36. Submit the report
-37. Go to admin view
-38. Click Approve Account (button)
-39. Admin login: Password: 8CX9XfgxDVtDPIPcZ03DumN7oMKqIoOB
-40. Enter jumping jacks into create exercise and submit
-41. Go to user view and login, looking for the jumping jack exercise at the bottom.
+### Pre-Recording Setup
+- [ ] **Delete user**: Siew Wei Heng
+- [ ] Delete JEFF BEZO, ELON MUSK and LEE CHONG WEI
+- [ ] **Logout** from admin panel (if logged in)
+
+---
+
+### User Registration & Basic Features
+
+**1. Register New User**
+- Name: `Siew Wei Heng`
+- Wing: `DIS Wing`
+- Password: `weiheng`
+
+**2. Test Session Persistence**
+- Close the website
+- Reopen the website
+- Verify user remains logged in
+
+**3. User Settings**
+- Click **user icon** (top right)
+- Close the modal
+
+**4. Leaderboard Features**
+- Click on a **user name** (in leaderboard)
+- View user score timeline
+- Close the modal
+
+**5. Mobile Responsiveness**
+- Open **inspect element** and set mobile view
+- Enter exercises:
+  - Burpees: `20`
+  - Pushups: `20`
+- Exit mobile setting
+
+---
+
+### Admin Panel - Wing Level
+
+**6. Admin Login (Wing Level)**
+- Go to **admin panel**
+- Password: `Wm1qIhpmiJlhb2Qe71D0OD4nbbKMCnae`
+
+**7. Nominal Roll Upload**
+- Click **"Upload Nominal Roll"** button
+- Click **?** (help button) to view guide
+- Go to **sheets.google.com**
+- Create CSV with name column:
+  - `JEFF BEZOS`
+  - `ELON MUSK`
+  - `LEE CHONG WEI`
+- **Files > Download > .csv**
+- Return to webapp
+- **Upload** the CSV file
+- Verify users table is updated
+
+**8. Manual User Creation**
+- Click **"Create User"** button
+- Close the modal
+
+9. Reports
+- Scroll down to reports
+---
+
+### Reports Feature - New Account Request
+
+**9. Test Registration Block**
+- Go to **user registration** page
+- Try to register: Name: `JEFF SU` (not in system)
+- Verify field is blocked
+
+**10. Submit New Account Report**
+- Click **"Report"** button
+- Fill out report form
+- **Submit report**
+
+**11. Admin Review - New Account**
+- Go to **admin view**
+- Click **?** next to "Reports" (view guide)
+- Hover over **?** next to report type (view explanation)
+- Click **"Create Account"** button (quick fix)
+
+---
+
+### Reports Feature - Account Conflict
+
+**12. Simulate Account Conflict**
+- Go to **register page**
+- Try to register:
+  - Name: `SIEW WEI HENG`
+  - Wing: `DIS WING`
+  - Password: `lmao`
+- Account conflict report should appear
+- **Submit the report**
+
+**13. Admin Review - Account Conflict**
+- Go to **admin view**
+- Verify report type shows `ACCOUNT_CONFLICT`
+- Click **"Approve Account"** button (quick fix)
+
+---
+
+### Admin Panel - OCS Level
+
+**14. Admin Login (OCS Level)**
+- Logout from wing admin
+- Go to **admin panel**
+- Password: `8CX9XfgxDVtDPIPcZ03DumN7oMKqIoOB`
+
+**15. Create Exercise**
+- Enter exercise name: `Jumping Jacks`
+- **Submit** the form
+
+**16. Verify Exercise in User View**
+- Go to **user view** and login
+- Verify "Jumping Jacks" exercise appears at the bottom
