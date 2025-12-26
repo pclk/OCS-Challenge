@@ -31,7 +31,7 @@ function parseCSVContent(csvContent: string): Array<{ name: string }> {
     // Handle CSV with potential commas in values (simple parsing)
     const values = line.split(',').map(v => v.trim());
     return {
-      name: values[0] || '',
+      name: (values[0] || '').toUpperCase().trim(),
     };
   }).filter(row => row.name); // Filter out empty rows
 }

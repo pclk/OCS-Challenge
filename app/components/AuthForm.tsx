@@ -110,7 +110,7 @@ export default function AuthForm() {
     return () => clearTimeout(timeoutId);
   }, [name, wing, password, isLogin]);
 
-  // Focus password field when it becomes visible
+  // Focus password field when it becomes visible (login mode)
   useEffect(() => {
     if (isLogin && !userNeedsPassword && name.trim() && wing.trim() && passwordRef.current) {
       // Small delay to ensure the field is rendered
@@ -120,6 +120,17 @@ export default function AuthForm() {
       return () => clearTimeout(timeoutId);
     }
   }, [isLogin, userNeedsPassword, name, wing]);
+
+  // Focus password field when wing is selected (registration mode)
+  useEffect(() => {
+    if (!isLogin && wing.trim() && name.trim() && passwordRef.current) {
+      // Small delay to ensure the field is rendered
+      const timeoutId = setTimeout(() => {
+        passwordRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isLogin, wing, name]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -368,7 +379,7 @@ export default function AuthForm() {
                     if (passwordInput) {
                       passwordInput.focus();
                     }
-                  } else if (!isLogin) {
+                  } else if (!isLogin && name.trim() && wing.trim()) {
                     const passwordInput = document.getElementById('password') as HTMLInputElement;
                     if (passwordInput) {
                       passwordInput.focus();
@@ -380,7 +391,7 @@ export default function AuthForm() {
                       submitButton.focus();
                     }
                   }
-                }, 100);
+                }, 150);
               }}
             />
           </div>

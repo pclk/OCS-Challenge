@@ -97,6 +97,8 @@ In the correct admin wing, we can see the Reports section. Each report displays 
 
 [Click Create Account] For new account requests, we can use the quick fix "Create Account" button to immediately create the user account. The report is automatically dismissed after successful creation. Thereafter, the admin should notify the user through relevant channels, and they may proceed to login.
 
+[Go to login page] Let's verify that the account was created successfully by logging in as JEFF SU. [Enter JEFF SU credentials and login] Perfect! The login succeeds, confirming that the account creation process worked correctly.
+
 [Go to register page] For account conflict, let's say that a malicious or careless actor has already signed into your account before you even did, and set a password "weiheng" so that you cannot login. Let's simulate the victim trying to register with their desired password.
 
 [
@@ -199,14 +201,12 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 - Verify user is removed from the table
 
 **9. Score Management (via Edit User)**
-- Click **"Edit"** button on any user in the Users table
+- Click **"Edit"** button on "Bryan" in the Users table
 - Click **"Score Management"** tab in the Edit User modal
 - View scores for that user
 - (Optional) Click **"Delete"** on a score to test deletion
 - Close the modal
 
-**10. Reports**
-- Scroll down to reports
 ---
 
 ### Reports Feature - New Account Request
@@ -218,7 +218,11 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 
 **12. Submit New Account Report**
 - Click **"Report"** button
-- Fill out report form
+- Fill out report form:
+  - Name: `JEFF SU`
+  - Wing: DIS WING
+  - Password: weiheng
+  - (Optional) Fill in email, phone, notes
 - **Submit report**
 
 **13. Admin Review - New Account**
@@ -226,6 +230,15 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 - Click **?** next to "Reports" (view guide)
 - Hover over **?** next to report type (view explanation)
 - Click **"Create Account"** button (quick fix)
+
+**13a. Verify Account Creation - Login as JEFF SU**
+- Go to **login page**
+- Enter credentials:
+  - Name: `JEFF SU`
+  - Wing: DIS WING
+  - Password: weiheng
+- Click **Login** or press Enter
+- Verify login succeeds and user is logged in
 
 ---
 

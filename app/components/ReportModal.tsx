@@ -136,8 +136,9 @@ export default function ReportModal({ initialName = '', initialWing = '', isAcco
                 id="report-name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white"
+                onChange={(e) => setName(e.target.value.toUpperCase())}
+                className="w-full px-3 py-2 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white uppercase"
+                style={{ textTransform: 'uppercase' }}
                 placeholder="Enter your name"
                 required
                 disabled={isSubmitting}

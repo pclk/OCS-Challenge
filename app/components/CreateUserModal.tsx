@@ -52,8 +52,9 @@ export default function CreateUserModal({
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => onFormChange({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-white/20 rounded-md bg-black text-white"
+                onChange={(e) => onFormChange({ ...formData, name: e.target.value.toUpperCase() })}
+                className="w-full px-3 py-2 border border-white/20 rounded-md bg-black text-white uppercase"
+                style={{ textTransform: 'uppercase' }}
                 required
               />
             </div>
