@@ -13,7 +13,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
-  login: (name: string, wing: string, password: string) => Promise<{ success: boolean; message?: string; shouldRegister?: boolean }>;
+  login: (name: string, wing: string, password: string, rememberMe?: '7days' | '30days' | 'forever') => Promise<{ success: boolean; message?: string; shouldRegister?: boolean }>;
   register: (name: string, wing: string, password: string) => Promise<{ success: boolean; message?: string; pendingApproval?: boolean; shouldLogin?: boolean }>;
   logout: () => void;
   verifyToken: () => Promise<boolean>;
@@ -90,14 +90,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return await verifyTokenWithServer(token);
   };
 
-  const login = async (name: string, wing: string, password: string): Promise<{ success: boolean; message?: string; shouldRegister?: boolean }> => {
+  const login = async (name: string, wing: string, password: string, rememberMe: '7days' | '30days' | 'forever' = '30days'): Promise<{ success: boolean; message?: string; shouldRegister?: boolean }> => {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, wing, password }),
+        body: JSON.stringify({ name, wing, password, rememberMe }),
       });
 
       const data = await response.json();

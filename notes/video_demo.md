@@ -103,7 +103,7 @@ The account conflict report pops up, allowing me to fill out a report to the adm
 
 [Submit the report] [Go to admin view]
 
-We can see the account conflict report in our admin view. Notice the report type is displayed as ACCOUNT_CONFLICT. [Click Approve Account] We can use the quick fix "Approve Account" button to approve the existing account, resolving the conflict. Alternatively, we may resolve the account by replacing the password via deletion and recreation if needed. The report can be dismissed after handling.
+We can see the account conflict report in our admin view. Notice the report type is displayed as ACCOUNT_CONFLICT. [Click Approve Account] We can use the quick fix "Approve Account" button to approve the existing account and update the password to the one provided in the report. This will automatically log out any users who were logged in with the old password, ensuring security. The report can be dismissed after handling.
 
 What if we want to add exercises? That would have to be on OCS level. [Go to OCS Level 8CX9XfgxDVtDPIPcZ03DumN7oMKqIoOB] Let's go there.
 
@@ -118,9 +118,9 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 ## Recording Instructions
 
 ### Pre-Recording Setup
-- [ ] **Delete user**: Siew Wei Heng
-- [ ] Delete JEFF BEZO, ELON MUSK and LEE CHONG WEI
+- [ ] **Delete user**: Siew Wei Heng JEFF BEZO, ELON MUSK and LEE CHONG WEI
 - [ ] **Logout** from admin panel (if logged in)
+- [ ] Delete the sheets.google.csv fields
 
 ---
 
@@ -223,6 +223,7 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 - Go to **admin view**
 - Verify report type shows `ACCOUNT_CONFLICT`
 - Click **"Approve Account"** button (quick fix)
+- Note: This updates the password and logs out users with old tokens
 
 ---
 

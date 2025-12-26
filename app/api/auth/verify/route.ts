@@ -33,6 +33,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Check if password was changed after token was issued
+    // If passwordChangedAt exists and is after token timestamp, token is invalid
+    if (user.passwordChangedAt && payload.timestamp) {
+      const passwordChangedTime = new Date(user.passwordChangedAt).getTime();
+      if (passwordChangedTime > payload.timestamp) {
+        return NextResponse.json(
+          { error: 'Token invalidated - password was changed' },
+          { status: 401 }
+        );
+      }
+    }
+
     return NextResponse.json({
       valid: true,
       user: {

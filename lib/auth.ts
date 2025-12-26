@@ -19,8 +19,11 @@ const WING_ADMIN_PASSWORD = process.env.WING_ADMIN_PASSWORD || '';
 // Keep ADMIN_PASSWORD for backward compatibility
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
-// Token expiration (30 days in milliseconds)
-const TOKEN_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000;
+// Token expiration defaults (in milliseconds)
+const TOKEN_EXPIRATION_7_DAYS = 7 * 24 * 60 * 60 * 1000;
+const TOKEN_EXPIRATION_30_DAYS = 30 * 24 * 60 * 60 * 1000;
+const TOKEN_EXPIRATION_FOREVER = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years (effectively forever)
+const TOKEN_EXPIRATION_MS = TOKEN_EXPIRATION_30_DAYS; // Default
 
 export interface TokenPayload {
   userId: number;
@@ -53,10 +56,19 @@ export function verifyPassword(password: string, hash: string): boolean {
 
 /**
  * Generate a session token for a user
+ * @param userId - User ID
+ * @param name - User name
+ * @param wing - User wing
+ * @param expirationMs - Optional custom expiration time in milliseconds. If not provided, uses default (30 days)
  */
-export function generateSessionToken(userId: number, name: string, wing: string | null): string {
+export function generateSessionToken(
+  userId: number, 
+  name: string, 
+  wing: string | null, 
+  expirationMs?: number
+): string {
   const timestamp = Date.now();
-  const expiresAt = timestamp + TOKEN_EXPIRATION_MS;
+  const expiresAt = timestamp + (expirationMs || TOKEN_EXPIRATION_MS);
   
   const payload: TokenPayload = {
     userId,
@@ -80,6 +92,22 @@ export function generateSessionToken(userId: number, name: string, wing: string 
   };
 
   return Buffer.from(JSON.stringify(tokenData)).toString('base64url');
+}
+
+/**
+ * Get expiration time in milliseconds based on remember me option
+ */
+export function getExpirationTime(rememberMe: '7days' | '30days' | 'forever'): number {
+  switch (rememberMe) {
+    case '7days':
+      return TOKEN_EXPIRATION_7_DAYS;
+    case '30days':
+      return TOKEN_EXPIRATION_30_DAYS;
+    case 'forever':
+      return TOKEN_EXPIRATION_FOREVER;
+    default:
+      return TOKEN_EXPIRATION_30_DAYS;
+  }
 }
 
 /**

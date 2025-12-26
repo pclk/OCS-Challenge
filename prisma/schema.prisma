@@ -35,13 +35,14 @@ model NameRankMapping {
 }
 
 model User {
-  id          Int       @id @default(autoincrement())
-  name        String
-  wing        String?
-  password    String?
-  hasLoggedIn Boolean   @default(false) @map("has_logged_in")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  scores      Score[]
+  id              Int       @id @default(autoincrement())
+  name            String
+  wing            String?
+  password        String?
+  hasLoggedIn     Boolean   @default(false) @map("has_logged_in")
+  passwordChangedAt DateTime? @map("password_changed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  scores          Score[]
 
   @@unique([name, wing])
   @@map("users")

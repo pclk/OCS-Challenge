@@ -457,7 +457,7 @@ export default function AdminPanel() {
     }
   };
 
-  const handleApproveConflict = async (report: { id: string; name: string; wing: string }) => {
+  const handleApproveConflict = async (report: { id: string; name: string; wing: string; password?: string }) => {
     if (!adminToken) return;
     setLoading(true);
     try {
@@ -470,25 +470,33 @@ export default function AdminPanel() {
       const data = await response.json();
       if (response.ok && data.users && data.users.length > 0) {
         const user = data.users[0];
-        // Approve the user
-        const updateResponse = await fetch('/api/admin/users', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${adminToken}`,
-          },
-          body: JSON.stringify({
-            userId: user.id,
-            approved: true,
-          }),
-        });
-        const updateData = await updateResponse.json();
-        if (updateResponse.ok && updateData.success) {
+        
+        // If password is provided in the report, update it (this will invalidate old tokens)
+        if (report.password && report.password.trim()) {
+          const updateResponse = await fetch('/api/admin/users', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${adminToken}`,
+            },
+            body: JSON.stringify({
+              userId: user.id,
+              password: report.password.trim(),
+            }),
+          });
+          const updateData = await updateResponse.json();
+          if (updateResponse.ok && updateData.success) {
+            toast.success('Account approved and password updated. Users with old tokens will be logged out.');
+            fetchUsers(adminToken, userPage, userSearch);
+            handleDismissReport(report.id);
+          } else {
+            toast.error(updateData.error || 'Failed to approve account');
+          }
+        } else {
+          // No password provided, just approve (though this shouldn't happen for account conflicts)
           toast.success('Account approved');
           fetchUsers(adminToken, userPage, userSearch);
           handleDismissReport(report.id);
-        } else {
-          toast.error(updateData.error || 'Failed to approve account');
         }
       } else {
         toast.error('User not found');

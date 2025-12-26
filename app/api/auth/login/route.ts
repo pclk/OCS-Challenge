@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateUser, checkUserExistsWithoutPassword, checkUserExistsWithPassword, logAccountAction } from '@/lib/db';
-import { generateSessionToken } from '@/lib/auth';
+import { generateSessionToken, getExpirationTime } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, wing, password } = body;
+    const { name, wing, password, rememberMe } = body;
 
     // Validate inputs
     if (!name || !wing) {
@@ -60,8 +60,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate session token
-    const token = generateSessionToken(user.id, user.name, user.wing);
+    // Generate session token with appropriate expiration based on rememberMe option
+    // Default to 30 days if not specified
+    const rememberMeOption = rememberMe || '30days';
+    const expirationMs = getExpirationTime(rememberMeOption as '7days' | '30days' | 'forever');
+    const token = generateSessionToken(user.id, user.name, user.wing, expirationMs);
 
     // Log login action
     await logAccountAction(

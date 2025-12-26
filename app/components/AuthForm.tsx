@@ -13,6 +13,7 @@ export default function AuthForm() {
   const [name, setName] = useState('');
   const [wing, setWing] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState<'7days' | '30days' | 'forever'>('30days');
   const [wings, setWings] = useState<string[]>([]);
   const [names, setNames] = useState<string[]>([]);
   const [loadingWings, setLoadingWings] = useState(false);
@@ -109,6 +110,17 @@ export default function AuthForm() {
     return () => clearTimeout(timeoutId);
   }, [name, wing, password, isLogin]);
 
+  // Focus password field when it becomes visible
+  useEffect(() => {
+    if (isLogin && !userNeedsPassword && name.trim() && wing.trim() && passwordRef.current) {
+      // Small delay to ensure the field is rendered
+      const timeoutId = setTimeout(() => {
+        passwordRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isLogin, userNeedsPassword, name, wing]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -141,7 +153,7 @@ export default function AuthForm() {
           return;
         }
 
-        const result = await login(name.trim(), wing.trim(), password);
+        const result = await login(name.trim(), wing.trim(), password, rememberMe);
         if (result.success) {
           toast.success('Login successful!');
         } else {
@@ -374,33 +386,84 @@ export default function AuthForm() {
           </div>
 
           {isLogin && !userNeedsPassword && name.trim() && wing.trim() && (
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-white mb-1">
-                Password
-              </label>
-              <input
-                ref={passwordRef}
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    // Submit form
-                    const form = e.currentTarget.closest('form');
-                    if (form) {
-                      form.requestSubmit();
+            <>
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-white mb-1">
+                  Password
+                </label>
+                <input
+                  ref={passwordRef}
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      // Submit form
+                      const form = e.currentTarget.closest('form');
+                      if (form) {
+                        form.requestSubmit();
+                      }
                     }
-                  }
-                }}
-                className="w-full px-3 py-2 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white"
-                placeholder="Enter your password"
-                required
-                minLength={4}
-                disabled={isSubmitting}
-              />
-            </div>
+                  }}
+                  className="w-full px-3 py-2 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white"
+                  placeholder="Enter your password"
+                  required
+                  minLength={4}
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white mb-2">
+                  Remember Me
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="rememberMe"
+                      value="7days"
+                      checked={rememberMe === '7days'}
+                      onChange={(e) => setRememberMe(e.target.value as '7days' | '30days' | 'forever')}
+                      className="mr-2 w-4 h-4 text-[#ff7301] focus:ring-[#ff7301] focus:ring-2 bg-black border-white/20"
+                      disabled={isSubmitting}
+                    />
+                    <span className="text-white text-sm">
+                      Remember me for 7 days <span className="text-green-400 text-xs">(Safest)</span>
+                    </span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="rememberMe"
+                      value="30days"
+                      checked={rememberMe === '30days'}
+                      onChange={(e) => setRememberMe(e.target.value as '7days' | '30days' | 'forever')}
+                      className="mr-2 w-4 h-4 text-[#ff7301] focus:ring-[#ff7301] focus:ring-2 bg-black border-white/20"
+                      disabled={isSubmitting}
+                    />
+                    <span className="text-white text-sm">
+                      Remember me for 30 days <span className="text-yellow-400 text-xs">(Medium)</span>
+                    </span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="rememberMe"
+                      value="forever"
+                      checked={rememberMe === 'forever'}
+                      onChange={(e) => setRememberMe(e.target.value as '7days' | '30days' | 'forever')}
+                      className="mr-2 w-4 h-4 text-[#ff7301] focus:ring-[#ff7301] focus:ring-2 bg-black border-white/20"
+                      disabled={isSubmitting}
+                    />
+                    <span className="text-white text-sm">
+                      Remember me forever <span className="text-red-400 text-xs">(Riskiest)</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </>
           )}
           {!isLogin && (
             <div>

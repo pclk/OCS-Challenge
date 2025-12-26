@@ -490,14 +490,14 @@ export async function setUserPassword(
   // Hash password
   const hashedPassword = hashPassword(password);
 
-  // Update user with password using raw SQL
+  // Update user with password and passwordChangedAt using raw SQL
   const updateResult = await prisma.$queryRaw<Array<{
     id: number;
     name: string;
     wing: string | null;
   }>>`
     UPDATE users
-    SET password = ${hashedPassword}
+    SET password = ${hashedPassword}, password_changed_at = CURRENT_TIMESTAMP
     WHERE id = ${userId}
     RETURNING id, name, wing
   `;
@@ -563,8 +563,9 @@ export async function getUserById(id: number) {
     id: number;
     name: string;
     wing: string | null;
+    password_changed_at: Date | null;
   }>>`
-    SELECT id, name, wing
+    SELECT id, name, wing, password_changed_at
     FROM users
     WHERE id = ${id}
     LIMIT 1
@@ -579,6 +580,7 @@ export async function getUserById(id: number) {
     id: user.id,
     name: user.name,
     wing: user.wing,
+    passwordChangedAt: user.password_changed_at,
   };
 }
 
@@ -922,8 +924,16 @@ export async function updateUser(
     updateData.wing = updates.wing;
   }
   
+  // If password is being updated, hash it and set passwordChangedAt
   if (updates.password !== undefined) {
-    updateData.password = updates.password ? hashPassword(updates.password) : null;
+    if (updates.password) {
+      const hashedPassword = hashPassword(updates.password);
+      updateData.password = hashedPassword;
+      updateData.passwordChangedAt = new Date();
+    } else {
+      updateData.password = null;
+      // Don't set passwordChangedAt when clearing password
+    }
   }
   
   if (Object.keys(updateData).length === 0) {
@@ -966,6 +976,11 @@ export async function updateUser(
       params.push(updateData.password);
       paramIndex++;
     }
+  }
+  if (updateData.passwordChangedAt !== undefined) {
+    setParts.push(`password_changed_at = $${paramIndex}`);
+    params.push(updateData.passwordChangedAt);
+    paramIndex++;
   }
   
   params.push(userId);
