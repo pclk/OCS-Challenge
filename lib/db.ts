@@ -1503,6 +1503,48 @@ export async function getUserScoresTimeline(userId: number) {
   }));
 }
 
+// Get all scores for a wing (for admin panel)
+export async function getScoresByWing(wing: string) {
+  await ensureInitialized();
+  
+  const scores = await prisma.score.findMany({
+    where: {
+      user: {
+        wing: wing,
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      exercise: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          wing: true,
+        },
+      },
+    },
+  });
+  
+  return scores.map(s => ({
+    id: s.id,
+    value: s.value,
+    createdAt: s.createdAt.toISOString(),
+    exerciseId: s.exerciseId,
+    exerciseName: s.exercise.name,
+    exerciseType: s.exercise.type,
+    userId: s.userId,
+    userName: s.user.name,
+    userWing: s.user.wing,
+  }));
+}
+
 // Create multiple scores (bulk)
 export async function createScores(scores: Array<{ userId: number; exerciseId: number; value: number }>) {
   console.log('[DB] createScores - Called with scores:', {

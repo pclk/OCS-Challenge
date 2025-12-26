@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { deleteScore, getUserScoresTimeline } from '@/lib/db';
+import { deleteScore, getUserScoresTimeline, getScoresByWing } from '@/lib/db';
 import { getAdminLevel, getWingFromPassword } from '@/lib/auth';
 
 async function verifyWingAdmin(request: NextRequest): Promise<{ isAdmin: boolean; wing?: string | null }> {
@@ -79,15 +79,37 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// Get user score timeline
+// Get scores - supports both userId (for timeline) and wing (for admin panel)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+    const wing = searchParams.get('wing');
 
+    // If wing is provided, fetch all scores for that wing (more efficient)
+    if (wing) {
+      const { isAdmin, wing: adminWing } = await verifyWingAdmin(request);
+      if (!isAdmin) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+      
+      // For wing admins, ensure they can only access their own wing
+      const targetWing = adminWing || wing;
+      const scores = await getScoresByWing(targetWing);
+      
+      return NextResponse.json({
+        success: true,
+        scores,
+      });
+    }
+
+    // Otherwise, fetch by userId (for timeline view)
     if (!userId) {
       return NextResponse.json(
-        { error: 'userId is required' },
+        { error: 'userId or wing is required' },
         { status: 400 }
       );
     }

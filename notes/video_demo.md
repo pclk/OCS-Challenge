@@ -71,7 +71,9 @@ As you can see, the users tables are updated.
 
 [Close ]
 
-We can view the score management accordingly here.
+[Click Edit on a user] To manage scores for a user, we can click the Edit button on any user. This opens the Edit User interface with two tabs: User Details and Score Management. [Click Score Management tab] In the Score Management tab, we can view all scores for that user and delete any scores if needed.
+
+[Close ]
 
 Now let's explore the Reports section. [Go to user registration] To understand how reports work, let's go to the registration page.
 
@@ -175,23 +177,30 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 - Click **"Create User"** button
 - Close the modal
 
-9. Reports
+**9. Score Management (via Edit User)**
+- Click **"Edit"** button on any user in the Users table
+- Click **"Score Management"** tab in the Edit User modal
+- View scores for that user
+- (Optional) Click **"Delete"** on a score to test deletion
+- Close the modal
+
+**10. Reports**
 - Scroll down to reports
 ---
 
 ### Reports Feature - New Account Request
 
-**9. Test Registration Block**
+**11. Test Registration Block**
 - Go to **user registration** page
 - Try to register: Name: `JEFF SU` (not in system)
 - Verify field is blocked
 
-**10. Submit New Account Report**
+**12. Submit New Account Report**
 - Click **"Report"** button
 - Fill out report form
 - **Submit report**
 
-**11. Admin Review - New Account**
+**13. Admin Review - New Account**
 - Go to **admin view**
 - Click **?** next to "Reports" (view guide)
 - Hover over **?** next to report type (view explanation)
@@ -201,7 +210,7 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 
 ### Reports Feature - Account Conflict
 
-**12. Simulate Account Conflict**
+**14. Simulate Account Conflict**
 - Go to **register page**
 - Try to register:
   - Name: `SIEW WEI HENG`
@@ -210,7 +219,7 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 - Account conflict report should appear
 - **Submit the report**
 
-**13. Admin Review - Account Conflict**
+**15. Admin Review - Account Conflict**
 - Go to **admin view**
 - Verify report type shows `ACCOUNT_CONFLICT`
 - Click **"Approve Account"** button (quick fix)
@@ -219,15 +228,15 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 
 ### Admin Panel - OCS Level
 
-**14. Admin Login (OCS Level)**
+**16. Admin Login (OCS Level)**
 - Logout from wing admin
 - Go to **admin panel**
 - Password: `8CX9XfgxDVtDPIPcZ03DumN7oMKqIoOB`
 
-**15. Create Exercise**
+**17. Create Exercise**
 - Enter exercise name: `Jumping Jacks`
 - **Submit** the form
 
-**16. Verify Exercise in User View**
+**18. Verify Exercise in User View**
 - Go to **user view** and login
 - Verify "Jumping Jacks" exercise appears at the bottom
