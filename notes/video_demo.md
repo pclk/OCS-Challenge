@@ -97,7 +97,7 @@ In the correct admin wing, we can see the Reports section. Each report displays 
 
 [Click Create Account] For new account requests, we can use the quick fix "Create Account" button to immediately create the user account. The report is automatically dismissed after successful creation. Thereafter, the admin should notify the user through relevant channels, and they may proceed to login.
 
-[Go to register page] For account conflict, let's say that a malicious or careless actor has already signed into your account before you even did, and set a password so that you cannot login. Let's simulate the victim.
+[Go to register page] For account conflict, let's say that a malicious or careless actor has already signed into your account before you even did, and set a password "weiheng" so that you cannot login. Let's simulate the victim trying to register with their desired password.
 
 [
     Name: SIEW WEI HENG
@@ -109,7 +109,9 @@ The account conflict report pops up, allowing me to fill out a report to the adm
 
 [Submit the report] [Go to admin view]
 
-We can see the account conflict report in our admin view. Notice the report type is displayed as ACCOUNT_CONFLICT. [Click Approve Account] We can use the quick fix "Approve Account" button to approve the existing account and update the password to the one provided in the report. This will automatically log out any users who were logged in with the old password, ensuring security. The report can be dismissed after handling.
+We can see the account conflict report in our admin view. Notice the report type is displayed as ACCOUNT_CONFLICT. [Click Approve Account] We can use the quick fix "Approve Account" button to approve the existing account and update the password to the one provided in the report, which is "lmao". This will automatically log out any users who were logged in with the old password, ensuring security. The report can be dismissed after handling.
+
+[Go to login page] Now let's verify that the password change worked. First, let's try logging in with the old password "weiheng". [Enter weiheng as password] As expected, this fails because the password has been changed. Now let's try with the new password "lmao". [Enter lmao as password] Perfect! The login succeeds, confirming that the approval process successfully updated the password.
 
 What if we want to add exercises? That would have to be on OCS level. [Go to OCS Level 8CX9XfgxDVtDPIPcZ03DumN7oMKqIoOB] Let's go there.
 
@@ -229,19 +231,33 @@ This concludes the current feature set for the OCS PT Challenge. I hope you've g
 ### Reports Feature - Account Conflict
 
 **14. Simulate Account Conflict**
+- **First, ensure account exists with password "weiheng"** (this should already exist from initial registration)
 - Go to **register page**
 - Try to register:
   - Name: `SIEW WEI HENG`
   - Wing: `DIS WING`
   - Password: `lmao`
 - Account conflict report should appear
-- **Submit the report**
+- **Submit the report** (with password "lmao" in the report)
 
 **15. Admin Review - Account Conflict**
 - Go to **admin view**
 - Verify report type shows `ACCOUNT_CONFLICT`
 - Click **"Approve Account"** button (quick fix)
-- Note: This updates the password and logs out users with old tokens
+- Note: This updates the password to "lmao" and logs out users with old tokens
+
+**15a. Verify Password Change**
+- Go to **login page**
+- Try to login with:
+  - Name: `SIEW WEI HENG`
+  - Wing: `DIS WING`
+  - Password: `weiheng` (old password)
+- Verify login **fails** (password no longer works)
+- Try to login with:
+  - Name: `SIEW WEI HENG`
+  - Wing: `DIS WING`
+  - Password: `lmao` (new password from report)
+- Verify login **succeeds** (password was successfully updated)
 
 ---
 
