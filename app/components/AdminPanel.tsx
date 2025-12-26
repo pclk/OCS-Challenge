@@ -344,10 +344,6 @@ export default function AdminPanel() {
         setEditingUser(null);
         setEditForm({ name: '', wing: '', password: '', approved: false });
         fetchUsers(adminToken, userPage, userSearch);
-        if (adminLevel === 'WING') {
-          fetchPendingUsers(adminToken, adminWing);
-          fetchConflicts(adminToken, adminWing);
-        }
       } else {
         toast.error(data.error || 'Failed to update user');
       }
@@ -576,41 +572,6 @@ export default function AdminPanel() {
         }
       } else {
         toast.error('User not found');
-      }
-    } catch (error) {
-      toast.error('Network error. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUploadNominalRoll = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminToken || !csvFile) {
-      toast.error('Please select a CSV file');
-      return;
-    }
-    if (!adminWing) {
-      toast.error('Wing not found. Please ensure you are logged in with a wing-specific password.');
-      return;
-    }
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', csvFile);
-
-      const response = await fetch('/api/admin/upload-nominal-roll', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${adminToken}` },
-        body: formData,
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        toast.success(`Upload successful: ${data.summary.created} created, ${data.summary.updated} updated`);
-        setCsvFile(null);
-        fetchUsers(adminToken, userPage, userSearch);
-      } else {
-        toast.error(data.error || 'Failed to upload');
       }
     } catch (error) {
       toast.error('Network error. Please try again.');
