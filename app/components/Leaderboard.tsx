@@ -522,7 +522,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     key={entry.user_id}
                     className={`rounded-lg p-4 ${
                       isUser 
-                        ? 'bg-gray-800 border border-[#ff7301]' 
+                        ? 'bg-gray-800 border border-[#ff7301] sticky bottom-0 z-20' 
                         : entry.achieved_goal 
                           ? 'bg-green-900/30 border border-green-600/50' 
                           : 'border border-white/20 bg-black'
@@ -631,7 +631,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                         <tr
                           className={`${
                             isUser 
-                              ? 'bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301]' 
+                              ? 'bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] sticky bottom-0 z-20' 
                               : entry.achieved_goal 
                                 ? 'bg-green-900/30 border-b border-white/10' 
                                 : 'border-b border-white/10 hover:bg-white/5'
@@ -686,7 +686,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                         <tr
                           className={`${
                             isUser 
-                              ? 'bg-gray-800 [&>td]:border-l [&>td]:border-r [&>td]:border-b [&>td]:border-[#ff7301]' 
+                              ? 'bg-gray-800 [&>td]:border-l [&>td]:border-r [&>td]:border-b [&>td]:border-[#ff7301] sticky bottom-0 z-20' 
                               : entry.achieved_goal 
                                 ? 'bg-green-900/30 border-b border-white/10' 
                                 : 'border-b border-white/10'
@@ -776,7 +776,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
           ) : (
             <>
               {/* Mobile Card View */}
-              <div className="block sm:hidden space-y-3">
+              <div className="block sm:hidden space-y-3 max-h-[400px] overflow-y-auto pr-2">
                 {paginatedExerciseData.map((entry) => {
                   const isUser = isUserEntry(entry.user_name, entry.wing);
                   const isPlaceholder = entry.exercise_id === -1;
@@ -785,7 +785,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     key={entry.exercise_id}
                     className={`rounded-lg p-4 transition-colors flex flex-col ${
                       isUser 
-                        ? 'bg-gray-800 border border-[#ff7301]' 
+                        ? 'bg-gray-800 border border-[#ff7301] sticky bottom-0 z-20' 
                         : 'border border-white/20 bg-black hover:bg-white/5'
                     }`}
                   >
@@ -819,9 +819,9 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                 })}
               </div>
               {/* Desktop Table View */}
-              <div className="hidden sm:block overflow-x-auto">
+              <div className="hidden sm:block overflow-x-auto max-h-[400px] overflow-y-auto">
                 <table className="w-full">
-                  <thead>
+                  <thead className="sticky top-0 bg-black z-10">
                     <tr className="border-b border-white/20">
                       <th className="text-left py-2 px-4 font-semibold text-white">Exercise</th>
                       <th className="text-left py-2 px-4 font-semibold text-white">Name</th>
@@ -839,7 +839,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                         key={entry.exercise_id}
                         className={`border-b ${
                           isUser 
-                            ? 'bg-gray-800 border-[#ff7301]' 
+                            ? 'bg-gray-800 border-[#ff7301] sticky bottom-0 z-20' 
                             : 'border-white/10 hover:bg-white/5'
                         }`}
                       >
@@ -925,7 +925,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                   ) : (
                     <>
                       {/* Mobile Card View */}
-                      <div className="block sm:hidden space-y-3">
+                      <div className="block sm:hidden space-y-3 max-h-[400px] overflow-y-auto pr-2">
                         {paginatedEntries.map((entry, index) => {
                           const isUser = isUserEntry(entry.user_name, entry.wing);
                           const isPlaceholder = entry.id === -1;
@@ -934,7 +934,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                             key={entry.id}
                             className={`rounded-lg p-4 transition-colors flex flex-col ${
                               isUser 
-                                ? 'bg-gray-800 border border-[#ff7301]' 
+                                ? 'bg-gray-800 border border-[#ff7301] sticky bottom-0 z-20' 
                                 : 'border border-white/20 bg-black hover:bg-white/5'
                             }`}
                           >
@@ -965,9 +965,9 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                         })}
                       </div>
                       {/* Desktop Table View */}
-                      <div className="hidden sm:block overflow-x-auto">
+                      <div className="hidden sm:block overflow-x-auto max-h-[400px] overflow-y-auto">
                         <table className="w-full">
-                          <thead>
+                          <thead className="sticky top-0 bg-black z-10">
                             <tr className="border-b border-white/20">
                               <th className="text-left py-2 px-4 font-semibold text-white">Name</th>
                               <th className="text-left py-2 px-4 font-semibold text-white">Wing</th>
@@ -986,7 +986,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                                 key={entry.id}
                                 className={`border-b ${
                                   isUser 
-                                    ? 'bg-gray-800 border-[#ff7301]' 
+                                    ? 'bg-gray-800 border-[#ff7301] sticky bottom-0 z-20' 
                                     : 'border-white/10 hover:bg-white/5'
                                 }`}
                               >
