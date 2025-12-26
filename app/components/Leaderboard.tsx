@@ -275,17 +275,33 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     return processed;
   }, [allData, user, exercises, isUserEntry]);
 
+  // Helper to find user's entry in any dataset
+  const findUserEntry = useCallback((entries: TotalRepsEntry[] | ExerciseBasedEntry[] | LeaderboardEntry[]) => {
+    if (!user) return null;
+    return entries.find(entry => isUserEntry(entry.user_name, entry.wing)) || null;
+  }, [user, isUserEntry]);
+
+  // Helper to filter out user's entry from paginated data
+  const filterOutUserEntry = useCallback((entries: TotalRepsEntry[] | ExerciseBasedEntry[] | LeaderboardEntry[]) => {
+    if (!user) return entries;
+    return entries.filter(entry => !isUserEntry(entry.user_name, entry.wing));
+  }, [user, isUserEntry]);
+
   // Pagination helpers for Exercise-Based View
-  const totalPagesExercise = Math.ceil(processedExerciseBasedData.length / itemsPerPage);
+  const exerciseDataWithoutUser = filterOutUserEntry(processedExerciseBasedData);
+  const userExerciseEntry = findUserEntry(processedExerciseBasedData) as ExerciseBasedEntry | null;
+  const totalPagesExercise = Math.ceil(exerciseDataWithoutUser.length / itemsPerPage);
   const startIndexExercise = (currentPage - 1) * itemsPerPage;
   const endIndexExercise = startIndexExercise + itemsPerPage;
-  const paginatedExerciseData = processedExerciseBasedData.slice(startIndexExercise, endIndexExercise);
+  const paginatedExerciseData = exerciseDataWithoutUser.slice(startIndexExercise, endIndexExercise);
 
   // Pagination helpers for Total Reps View
-  const totalPagesTotalReps = Math.ceil(processedTotalRepsData.length / itemsPerPageTotal);
+  const totalRepsDataWithoutUser = filterOutUserEntry(processedTotalRepsData);
+  const userTotalRepsEntry = findUserEntry(processedTotalRepsData) as TotalRepsEntry | null;
+  const totalPagesTotalReps = Math.ceil(totalRepsDataWithoutUser.length / itemsPerPageTotal);
   const startIndexTotalReps = (currentPage - 1) * itemsPerPageTotal;
   const endIndexTotalReps = startIndexTotalReps + itemsPerPageTotal;
-  const paginatedTotalRepsData = processedTotalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
+  const paginatedTotalRepsData = totalRepsDataWithoutUser.slice(startIndexTotalReps, endIndexTotalReps);
 
   // Export to CSV functions for different tabs
   const exportTotalRepsToCSV = () => {
@@ -410,9 +426,16 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     const page = getExercisePage(exerciseName);
     const startIndex = (page - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return entries.slice(startIndex, endIndex);
+    const entriesWithoutUser = filterOutUserEntry(entries) as LeaderboardEntry[];
+    return entriesWithoutUser.slice(startIndex, endIndex);
   };
-  const getTotalPages = (entries: LeaderboardEntry[]) => Math.ceil(entries.length / itemsPerPage);
+  const getUserEntryForExercise = (entries: LeaderboardEntry[]) => {
+    return findUserEntry(entries) as LeaderboardEntry | null;
+  };
+  const getTotalPages = (entries: LeaderboardEntry[]) => {
+    const entriesWithoutUser = filterOutUserEntry(entries);
+    return Math.ceil(entriesWithoutUser.length / itemsPerPage);
+  };
 
   return (
     <div className="bg-black border border-white/20 rounded-lg shadow-md p-4 sm:p-6">
@@ -733,15 +756,183 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                       </React.Fragment>
                       );
                     })}
+                    {/* Always show user's entry at bottom if it exists and is not in current page */}
+                    {userTotalRepsEntry && !paginatedTotalRepsData.some(e => isUserEntry(e.user_name, e.wing)) && (
+                      <>
+                        <tr className="bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] sticky bottom-0 z-20">
+                          <td className={`py-3 px-4 font-medium ${getRankColorClass(userTotalRepsEntry.rank || 0)}`}>
+                            #{userTotalRepsEntry.rank}
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => setTimelineModal({ userId: userTotalRepsEntry.user_id, userName: userTotalRepsEntry.user_name, userWing: userTotalRepsEntry.wing })}
+                              className={`font-medium hover:text-[#ff7301] transition-colors cursor-pointer ${
+                                userTotalRepsEntry.achieved_goal ? 'text-green-400 font-bold' : 'text-white'
+                              }`}
+                            >
+                              {userTotalRepsEntry.user_name}
+                              {userTotalRepsEntry.achieved_goal && (
+                                <span className="ml-2 text-green-400">✓</span>
+                              )}
+                            </button>
+                          </td>
+                          <td className="py-3 px-4 text-white/80">
+                            {userTotalRepsEntry.wing || '-'}
+                          </td>
+                          <td className={`py-3 px-4 text-right font-semibold ${
+                            userTotalRepsEntry.achieved_goal ? 'text-green-400' : 'text-[#ff7301]'
+                          }`}>
+                            {userTotalRepsEntry.total_reps.toLocaleString()}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {userTotalRepsEntry.total_reps === 0 ? (
+                              <span className="text-white/50 text-sm">
+                                You haven't done any reps yet!
+                              </span>
+                            ) : userTotalRepsEntry.achieved_goal ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="px-3 py-1 bg-green-600 text-white rounded-full text-sm font-semibold">
+                                  Goal Achieved
+                                </span>
+                                <span className="text-white/60 text-xs">
+                                  {Math.min(Math.round((userTotalRepsEntry.total_reps / GOAL_REPS) * 100), 100)}%
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-white/60 text-sm">
+                                {Math.min(Math.round((userTotalRepsEntry.total_reps / GOAL_REPS) * 100), 100)}%
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                        <tr className="bg-gray-800 [&>td]:border-l [&>td]:border-r [&>td]:border-b [&>td]:border-[#ff7301] sticky bottom-0 z-20">
+                          <td colSpan={5} className="py-3 px-4">
+                            <div className="mt-2">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-white/60 text-xs">Progress</span>
+                                <span className="text-white/60 text-xs">
+                                  {Math.min(Math.round((userTotalRepsEntry.total_reps / GOAL_REPS) * 100), 100)}%
+                                </span>
+                              </div>
+                              <div className="relative w-full bg-white/10 rounded-full h-2 overflow-visible">
+                                <div className="absolute inset-0 flex items-center">
+                                  <div className="absolute left-[25%] w-px h-2 bg-white/30" />
+                                  <div className="absolute left-[50%] w-px h-2 bg-white/30" />
+                                  <div className="absolute left-[75%] w-px h-2 bg-white/30" />
+                                  <div className="absolute right-0 w-px h-2 bg-white/50" />
+                                </div>
+                                <div
+                                  className={`h-full rounded-full transition-all relative z-10 ${
+                                    userTotalRepsEntry.achieved_goal 
+                                      ? 'bg-green-500' 
+                                      : 'bg-[#ff7301]'
+                                  }`}
+                                  style={{
+                                    width: `${Math.min((userTotalRepsEntry.total_reps / GOAL_REPS) * 100, 100)}%`
+                                  }}
+                                />
+                              </div>
+                              <div className="flex justify-between mt-1">
+                                <span className="text-white/40 text-[10px]">25%</span>
+                                <span className="text-white/40 text-[10px]">50%</span>
+                                <span className="text-white/40 text-[10px]">75%</span>
+                                <span className="text-white/50 text-[10px] font-semibold">Goal</span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      </>
+                    )}
                   </tbody>
                 </table>
               </div>
+              {/* Mobile: Always show user's entry at bottom if it exists and is not in current page */}
+              {userTotalRepsEntry && !paginatedTotalRepsData.some(e => isUserEntry(e.user_name, e.wing)) && (
+                <div className="block sm:hidden sticky bottom-0 z-20 mt-3">
+                  <div className="rounded-lg p-4 bg-gray-800 border border-[#ff7301]">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-sm ${getRankColorClass(userTotalRepsEntry.rank || 0)}`}>#{userTotalRepsEntry.rank}</span>
+                          <button
+                            onClick={() => setTimelineModal({ userId: userTotalRepsEntry.user_id, userName: userTotalRepsEntry.user_name, userWing: userTotalRepsEntry.wing })}
+                            className={`font-medium hover:text-[#ff7301] transition-colors cursor-pointer ${
+                              userTotalRepsEntry.achieved_goal ? 'text-green-400 font-bold' : 'text-white'
+                            }`}
+                          >
+                            {userTotalRepsEntry.user_name}
+                            {userTotalRepsEntry.achieved_goal && (
+                              <span className="ml-2 text-green-400">✓</span>
+                            )}
+                          </button>
+                        </div>
+                        <div className="text-white/80 text-sm">
+                          {userTotalRepsEntry.wing || '-'}
+                        </div>
+                      </div>
+                      <div className={`text-right font-semibold text-lg ${
+                        userTotalRepsEntry.achieved_goal ? 'text-green-400' : 'text-[#ff7301]'
+                      }`}>
+                        {userTotalRepsEntry.total_reps.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                      {userTotalRepsEntry.total_reps === 0 ? (
+                        <span className="text-white/50 text-xs">
+                          You haven't done any reps yet!
+                        </span>
+                      ) : userTotalRepsEntry.achieved_goal ? (
+                        <span className="px-3 py-1 bg-green-600 text-white rounded-full text-xs font-semibold">
+                          Goal Achieved
+                        </span>
+                      ) : (
+                        <span className="text-white/60 text-xs">
+                          {Math.min(Math.round((userTotalRepsEntry.total_reps / GOAL_REPS) * 100), 100)}%
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-white/60 text-xs">Progress</span>
+                        <span className="text-white/60 text-xs">
+                          {Math.min(Math.round((userTotalRepsEntry.total_reps / GOAL_REPS) * 100), 100)}%
+                        </span>
+                      </div>
+                      <div className="relative w-full bg-white/10 rounded-full h-2 overflow-visible">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="absolute left-[25%] w-px h-2 bg-white/30" />
+                          <div className="absolute left-[50%] w-px h-2 bg-white/30" />
+                          <div className="absolute left-[75%] w-px h-2 bg-white/30" />
+                          <div className="absolute right-0 w-px h-2 bg-white/50" />
+                        </div>
+                        <div
+                          className={`h-full rounded-full transition-all relative z-10 ${
+                            userTotalRepsEntry.achieved_goal 
+                              ? 'bg-green-500' 
+                              : 'bg-[#ff7301]'
+                          }`}
+                          style={{
+                            width: `${Math.min((userTotalRepsEntry.total_reps / GOAL_REPS) * 100, 100)}%`
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-1">
+                        <span className="text-white/40 text-[10px]">25%</span>
+                        <span className="text-white/40 text-[10px]">50%</span>
+                        <span className="text-white/40 text-[10px]">75%</span>
+                        <span className="text-white/50 text-[10px] font-semibold">Goal</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
           {processedTotalRepsData.length > 0 && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mt-4 pt-4 border-t border-white/20">
               <div className="text-white/70 text-sm">
-                Showing {startIndexTotalReps + 1} to {Math.min(endIndexTotalReps, processedTotalRepsData.length)} of {processedTotalRepsData.length} entries
+                Showing {startIndexTotalReps + 1} to {Math.min(endIndexTotalReps, totalRepsDataWithoutUser.length)} of {totalRepsDataWithoutUser.length} entries
+                {userTotalRepsEntry && <span className="text-white/50"> (+ your entry)</span>}
               </div>
               {totalPagesTotalReps > 1 && (
                 <div className="flex items-center gap-2">
@@ -869,15 +1060,76 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                       </tr>
                       );
                     })}
+                    {/* Always show user's entry at bottom if it exists and is not in current page */}
+                    {userExerciseEntry && !paginatedExerciseData.some(e => isUserEntry(e.user_name, e.wing)) && (
+                      <tr className="bg-gray-800 border-[#ff7301] sticky bottom-0 z-20">
+                        <td className="py-3 px-4 text-white font-medium">
+                          <div className="flex items-center gap-2">
+                            <ExerciseIcon exerciseName={userExerciseEntry.exercise_name} className="w-5 h-5 text-[#ff7301]" />
+                            {userExerciseEntry.exercise_name}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={() => setTimelineModal({ userId: userExerciseEntry.user_id, userName: userExerciseEntry.user_name, userWing: userExerciseEntry.wing })}
+                            className="text-white hover:text-[#ff7301] transition-colors cursor-pointer"
+                          >
+                            {getDisplayName(userExerciseEntry)}
+                          </button>
+                        </td>
+                        <td className="py-3 px-4 text-white/80">
+                          {userExerciseEntry.wing || '-'}
+                        </td>
+                        <td className="py-3 px-4 text-[#ff7301] text-right font-semibold">
+                          {userExerciseEntry.value}
+                        </td>
+                        <td className="py-3 px-4 text-white/70 text-right text-sm">
+                          {userExerciseEntry.exercise_id === -1 ? "You haven't done any reps yet!" : formatDate(userExerciseEntry.created_at)}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
+              {/* Mobile: Always show user's entry at bottom if it exists and is not in current page */}
+              {userExerciseEntry && !paginatedExerciseData.some(e => isUserEntry(e.user_name, e.wing)) && (
+                <div className="block sm:hidden sticky bottom-0 z-20 mt-3">
+                  <div className="rounded-lg p-4 bg-gray-800 border border-[#ff7301] transition-colors flex flex-col">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <ExerciseIcon exerciseName={userExerciseEntry.exercise_name} className="w-5 h-5 text-[#ff7301]" />
+                          <span className="text-white font-medium text-sm">
+                            {userExerciseEntry.exercise_name}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setTimelineModal({ userId: userExerciseEntry.user_id, userName: userExerciseEntry.user_name, userWing: userExerciseEntry.wing })}
+                          className="text-white text-sm mb-1 hover:text-[#ff7301] transition-colors cursor-pointer text-left"
+                        >
+                          {getDisplayName(userExerciseEntry)}
+                        </button>
+                      </div>
+                      <div className="text-[#ff7301] text-right font-semibold text-lg">
+                        {userExerciseEntry.value}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-white/80 text-xs mt-auto">
+                      <span>{userExerciseEntry.wing || '-'}</span>
+                      <span className="text-white/70 text-right">
+                        {userExerciseEntry.exercise_id === -1 ? "You haven't done any reps yet!" : formatDate(userExerciseEntry.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
           {totalPagesExercise > 1 && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mt-4 pt-4 border-t border-white/20">
               <div className="text-white/70 text-sm">
-                Showing {startIndexExercise + 1} to {Math.min(endIndexExercise, processedExerciseBasedData.length)} of {processedExerciseBasedData.length} entries
+                Showing {startIndexExercise + 1} to {Math.min(endIndexExercise, exerciseDataWithoutUser.length)} of {exerciseDataWithoutUser.length} entries
+                {userExerciseEntry && <span className="text-white/50"> (+ your entry)</span>}
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -1013,9 +1265,69 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                               </tr>
                               );
                             })}
+                            {/* Always show user's entry at bottom if it exists and is not in current page */}
+                            {(() => {
+                              const userEntry = getUserEntryForExercise(entries);
+                              return userEntry && !paginatedEntries.some(e => isUserEntry(e.user_name, e.wing)) ? (
+                                <tr className="bg-gray-800 border-[#ff7301] sticky bottom-0 z-20">
+                                  <td className={`py-3 px-4 font-medium ${getRankColorClass(startIndex + paginatedEntries.length + 1)}`}>
+                                    #{startIndex + paginatedEntries.length + 1}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <button
+                                      onClick={() => setTimelineModal({ userId: userEntry.user_id, userName: userEntry.user_name, userWing: userEntry.wing })}
+                                      className="text-white hover:text-[#ff7301] transition-colors cursor-pointer"
+                                    >
+                                      {getDisplayName(userEntry)}
+                                    </button>
+                                  </td>
+                                  <td className="py-3 px-4 text-white/80">
+                                    {userEntry.wing || '-'}
+                                  </td>
+                                  <td className="py-3 px-4 text-[#ff7301] text-right font-semibold">
+                                    {userEntry.value}
+                                  </td>
+                                  <td className="py-3 px-4 text-white/70 text-right text-sm">
+                                    {userEntry.id === -1 ? "You haven't done any reps yet!" : formatDate(userEntry.created_at)}
+                                  </td>
+                                </tr>
+                              ) : null;
+                            })()}
                           </tbody>
                         </table>
                       </div>
+                      {/* Mobile: Always show user's entry at bottom if it exists and is not in current page */}
+                      {(() => {
+                        const userEntry = getUserEntryForExercise(entries);
+                        return userEntry && !paginatedEntries.some(e => isUserEntry(e.user_name, e.wing)) ? (
+                          <div className="block sm:hidden sticky bottom-0 z-20 mt-3">
+                            <div className="rounded-lg p-4 bg-gray-800 border border-[#ff7301] transition-colors flex flex-col">
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className={`text-xs ${getRankColorClass(startIndex + paginatedEntries.length + 1)}`}>#{startIndex + paginatedEntries.length + 1}</span>
+                                    <button
+                                      onClick={() => setTimelineModal({ userId: userEntry.user_id, userName: userEntry.user_name, userWing: userEntry.wing })}
+                                      className="text-white text-sm font-medium hover:text-[#ff7301] transition-colors cursor-pointer"
+                                    >
+                                      {getDisplayName(userEntry)}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="text-[#ff7301] text-right font-semibold text-lg">
+                                  {userEntry.value}
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between text-white/80 text-xs mt-auto">
+                                <span>{userEntry.wing || '-'}</span>
+                                <span className="text-white/70 text-right">
+                                  {userEntry.id === -1 ? "You haven't done any reps yet!" : formatDate(userEntry.created_at)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
                       {totalPages > 1 && (
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mt-4 pt-4 border-t border-white/20">
                           <div className="text-white/70 text-sm">

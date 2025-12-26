@@ -13,7 +13,7 @@ interface UserAccountModalProps {
 export default function UserAccountModal({ isOpen, onClose }: UserAccountModalProps) {
   const { user, logout, token } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -105,7 +105,7 @@ export default function UserAccountModal({ isOpen, onClose }: UserAccountModalPr
     }
   };
 
-  const handleDeleteAccount = async () => {
+  const handleResetAccount = async () => {
     if (!token) {
       toast.error('Not authenticated');
       return;
@@ -113,7 +113,7 @@ export default function UserAccountModal({ isOpen, onClose }: UserAccountModalPr
 
     setLoading(true);
     try {
-      const response = await fetch('/api/user/delete-account', {
+      const response = await fetch('/api/user/reset-account', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -124,17 +124,17 @@ export default function UserAccountModal({ isOpen, onClose }: UserAccountModalPr
       const data = await response.json();
 
       if (response.ok && data.success) {
-        toast.success('Account deleted successfully');
+        toast.success('Account reset successfully. You will be logged out.');
         logout();
         onClose();
       } else {
-        toast.error(data.error || 'Failed to delete account');
-        setShowDeleteConfirm(false);
+        toast.error(data.error || 'Failed to reset account');
+        setShowResetConfirm(false);
       }
     } catch (error) {
-      console.error('Delete account error:', error);
+      console.error('Reset account error:', error);
       toast.error('Network error. Please try again.');
-      setShowDeleteConfirm(false);
+      setShowResetConfirm(false);
     } finally {
       setLoading(false);
     }
@@ -169,7 +169,7 @@ export default function UserAccountModal({ isOpen, onClose }: UserAccountModalPr
           </div>
         )}
 
-        {!showDeleteConfirm && !showChangePassword ? (
+        {!showResetConfirm && !showChangePassword ? (
           <div className="space-y-3">
             <button
               onClick={() => setShowChangePassword(true)}
@@ -185,11 +185,11 @@ export default function UserAccountModal({ isOpen, onClose }: UserAccountModalPr
                 Logout
               </button>
               <button
-                onClick={() => setShowDeleteConfirm(true)}
+                onClick={() => setShowResetConfirm(true)}
                 disabled={loading}
-                className="flex-1 bg-red-600 text-white py-3 px-4 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 bg-yellow-600 text-white py-3 px-4 rounded-md hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Delete Account
+                Reset Account
               </button>
             </div>
           </div>
@@ -262,26 +262,29 @@ export default function UserAccountModal({ isOpen, onClose }: UserAccountModalPr
             </form>
           </div>
         ) : (
-          <div className="p-4 border border-red-600/50 rounded-md bg-red-600/10">
-            <h3 className="text-white font-semibold mb-3">Confirm Account Deletion</h3>
+          <div className="p-4 border border-yellow-600/50 rounded-md bg-yellow-600/10">
+            <h3 className="text-white font-semibold mb-3">Confirm Account Reset</h3>
             <p className="text-white mb-4">
-              Are you sure you want to delete your account? This action cannot be undone and will permanently delete:
+              Are you sure you want to reset your account? This will:
             </p>
             <ul className="text-white/70 text-sm list-disc list-inside mb-4 space-y-1">
-              <li>Your account</li>
-              <li>All your scores</li>
-              <li>All associated data</li>
+              <li>Remove your password (you'll need to set a new one to log in again)</li>
+              <li>Delete all your scores</li>
+              <li>Keep your account (you can still log in after setting a new password)</li>
             </ul>
+            <p className="text-white/50 text-xs mb-4">
+              Note: Your account will remain in the system and can still be selected when logging in or registering.
+            </p>
             <div className="flex gap-2">
               <button
-                onClick={handleDeleteAccount}
+                onClick={handleResetAccount}
                 disabled={loading}
-                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors"
+                className="flex-1 bg-yellow-600 text-white py-2 px-4 rounded-md hover:bg-yellow-700 disabled:opacity-50 transition-colors"
               >
-                {loading ? 'Deleting...' : 'Yes, Delete Account'}
+                {loading ? 'Resetting...' : 'Yes, Reset Account'}
               </button>
               <button
-                onClick={() => setShowDeleteConfirm(false)}
+                onClick={() => setShowResetConfirm(false)}
                 disabled={loading}
                 className="flex-1 bg-white/10 text-white py-2 px-4 rounded-md hover:bg-white/20 transition-colors"
               >
