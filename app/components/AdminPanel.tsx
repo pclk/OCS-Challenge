@@ -278,7 +278,7 @@ export default function AdminPanel() {
     setUserToDelete(user);
   };
 
-  const handleDeleteUserConfirm = async () => {
+  const handleDeleteUserConfirm = async (deletionType: 'reset' | 'ban') => {
     if (!adminToken || !userToDelete) return;
     setLoading(true);
     try {
@@ -288,15 +288,15 @@ export default function AdminPanel() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${adminToken}`,
         },
-        body: JSON.stringify({ userId: userToDelete.id }),
+        body: JSON.stringify({ userId: userToDelete.id, deletionType }),
       });
       const data = await response.json();
       if (response.ok && data.success) {
-        toast.success('User deleted successfully');
+        toast.success(deletionType === 'reset' ? 'User reset successfully' : 'User banned successfully');
         setUserToDelete(null);
         fetchUsers(adminToken, userPage, userSearch);
       } else {
-        toast.error(data.error || 'Failed to delete user');
+        toast.error(data.error || `Failed to ${deletionType === 'reset' ? 'reset' : 'ban'} user`);
       }
     } catch (error) {
       toast.error('Network error. Please try again.');

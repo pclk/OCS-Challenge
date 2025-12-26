@@ -597,7 +597,28 @@ export async function approveUser(userId: number) {
   // No-op: approval is no longer needed, all users are automatically "approved"
 }
 
-// Reject a user (delete the account)
+// Reset a user (remove password and scores, keep account)
+export async function resetUser(userId: number) {
+  await ensureInitialized();
+  const user = await getUserById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  
+  // Delete all scores
+  await prisma.$executeRaw`DELETE FROM scores WHERE user_id = ${userId}`;
+  
+  // Remove password and reset passwordChangedAt
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      password: null,
+      passwordChangedAt: null,
+    },
+  });
+}
+
+// Reject a user (delete the account - ban)
 export async function rejectUser(userId: number) {
   await ensureInitialized();
   // Get user info before deletion to remove from NameRankMapping

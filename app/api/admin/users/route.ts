@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllUsers, getUsersPaginated, createUser, updateUser, rejectUser, getUserById } from '@/lib/db';
+import { getAllUsers, getUsersPaginated, createUser, updateUser, rejectUser, resetUser, getUserById } from '@/lib/db';
 import { getAdminLevel, getWingFromPassword } from '@/lib/auth';
 
 async function verifyOCSAdmin(request: NextRequest): Promise<boolean> {
@@ -196,11 +196,18 @@ export async function DELETE(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userId } = body;
+    const { userId, deletionType } = body;
 
     if (!userId || typeof userId !== 'number') {
       return NextResponse.json(
         { error: 'Missing or invalid userId' },
+        { status: 400 }
+      );
+    }
+
+    if (!deletionType || (deletionType !== 'reset' && deletionType !== 'ban')) {
+      return NextResponse.json(
+        { error: 'Missing or invalid deletionType. Must be "reset" or "ban"' },
         { status: 400 }
       );
     }
@@ -222,11 +229,19 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    await rejectUser(userId);
-    return NextResponse.json({
-      success: true,
-      message: 'User deleted successfully',
-    });
+    if (deletionType === 'reset') {
+      await resetUser(userId);
+      return NextResponse.json({
+        success: true,
+        message: 'User reset successfully',
+      });
+    } else {
+      await rejectUser(userId);
+      return NextResponse.json({
+        success: true,
+        message: 'User banned successfully',
+      });
+    }
   } catch (error: any) {
     console.error('[API] DELETE /api/admin/users - Error:', error);
     return NextResponse.json(

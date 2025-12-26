@@ -267,13 +267,28 @@ export default function AuthForm() {
       if (result.success) {
         if (result.pendingApproval) {
           toast.success(result.message || 'Account created and pending approval');
-          // Reset form
-          setName('');
-          setWing('');
+          // Keep name and wing, clear password, switch to login mode
           setPassword('');
           setIsLogin(true); // Switch to login mode
+          // Focus on password field after switching to login
+          setTimeout(() => {
+            const passwordInput = document.getElementById('password') as HTMLInputElement;
+            if (passwordInput) {
+              passwordInput.focus();
+            }
+          }, 200);
         } else {
           toast.success(result.message || 'Registration successful!');
+          // Keep name and wing, clear password, switch to login mode
+          setPassword('');
+          setIsLogin(true);
+          // Focus on password field after switching to login
+          setTimeout(() => {
+            const passwordInput = document.getElementById('password') as HTMLInputElement;
+            if (passwordInput) {
+              passwordInput.focus();
+            }
+          }, 200);
         }
       } else {
         if (result.message?.includes('already exists')) {
