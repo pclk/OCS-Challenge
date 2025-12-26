@@ -356,7 +356,7 @@ export async function registerUser(
   name: string,
   wing: string,
   password: string
-): Promise<{ id: number; name: string; wing: string | null; approved: boolean; pendingApproval: boolean }> {
+): Promise<{ id: number; name: string; wing: string | null }> {
   await ensureInitialized();
   
   // Check if user already exists
