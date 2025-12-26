@@ -31,35 +31,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Load auth state from localStorage on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
-    const storedUser = localStorage.getItem(AUTH_USER_KEY);
+    const loadAuthState = async () => {
+      const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+      const storedUser = localStorage.getItem(AUTH_USER_KEY);
 
-    if (storedToken && storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        setToken(storedToken);
-        setUser(userData);
-        
-        // Verify token with server
-        verifyTokenWithServer(storedToken).then((isValid) => {
-          if (!isValid) {
-            // Token invalid, clear auth
+      if (storedToken && storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setToken(storedToken);
+          setUser(userData);
+          
+          // Verify token with server
+          try {
+            const response = await fetch('/api/auth/verify', {
+              headers: {
+                'Authorization': `Bearer ${storedToken}`,
+              },
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              if (data.valid && data.user) {
+                // Token is valid, update user data
+                setUser(data.user);
+                localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
+              } else {
+                // Token invalid
+                console.log('[Auth] Token invalid, clearing localStorage');
+                localStorage.removeItem(AUTH_TOKEN_KEY);
+                localStorage.removeItem(AUTH_USER_KEY);
+                setToken(null);
+                setUser(null);
+              }
+            } else if (response.status === 401) {
+              // Token is definitely invalid (401 Unauthorized)
+              console.log('[Auth] Token invalid (401), clearing localStorage');
+              localStorage.removeItem(AUTH_TOKEN_KEY);
+              localStorage.removeItem(AUTH_USER_KEY);
+              setToken(null);
+              setUser(null);
+            } else {
+              // Server error (500, etc.) - don't clear token, might be temporary
+              console.warn('[Auth] Server error during verification, keeping token. Status:', response.status);
+            }
+          } catch (networkError) {
+            // Network error - don't clear localStorage, user might be offline
+            console.warn('[Auth] Network error during token verification, keeping token. User might be offline.');
+          }
+          setLoading(false);
+        } catch (error) {
+          console.error('[Auth] Error loading auth state:', error);
+          // Only clear on parse errors (corrupted data)
+          if (error instanceof SyntaxError) {
+            console.error('[Auth] Corrupted user data in localStorage, clearing');
             localStorage.removeItem(AUTH_TOKEN_KEY);
             localStorage.removeItem(AUTH_USER_KEY);
             setToken(null);
             setUser(null);
           }
           setLoading(false);
-        });
-      } catch (error) {
-        console.error('Error loading auth state:', error);
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        localStorage.removeItem(AUTH_USER_KEY);
+        }
+      } else {
         setLoading(false);
       }
-    } else {
-      setLoading(false);
-    }
+    };
+
+    loadAuthState();
   }, []);
 
   const verifyTokenWithServer = async (tokenToVerify: string): Promise<boolean> => {
@@ -80,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return false;
     } catch (error) {
-      console.error('Error verifying token:', error);
+      console.error('[Auth] Error verifying token:', error);
       return false;
     }
   };
