@@ -236,11 +236,11 @@ export async function DELETE(request: NextRequest) {
         message: 'User reset successfully',
       });
     } else {
-      await rejectUser(userId);
-      return NextResponse.json({
-        success: true,
+    await rejectUser(userId);
+    return NextResponse.json({
+      success: true,
         message: 'User banned successfully',
-      });
+    });
     }
   } catch (error: any) {
     console.error('[API] DELETE /api/admin/users - Error:', error);

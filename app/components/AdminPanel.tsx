@@ -799,7 +799,7 @@ export default function AdminPanel() {
                           setEditForm({ name: user.name, wing: user.wing || '', password: '' });
                         }}
                         disabled={loading}
-                        className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                        className="bg-[#ff7301] text-white py-2 px-4 rounded-md hover:bg-[#ff7301]/90 disabled:opacity-50 transition-colors"
                       >
                         Edit
                       </button>
@@ -1036,6 +1036,7 @@ export default function AdminPanel() {
         }}
         loading={loading}
       />
+
 
 
       {/* Nominal Roll Upload Modal */}

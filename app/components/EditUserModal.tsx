@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import DeleteScoreModal from './DeleteScoreModal';
+import AddScoreModal from './AddScoreModal';
 
 interface EditUserModalProps {
   isOpen: boolean;
@@ -53,6 +54,7 @@ export default function EditUserModal({
   const [scores, setScores] = useState<Score[]>([]);
   const [scoresLoading, setScoresLoading] = useState(false);
   const [scoreToDelete, setScoreToDelete] = useState<{ id: number; userName: string; exerciseName: string; value: number } | null>(null);
+  const [showAddScoreModal, setShowAddScoreModal] = useState(false);
 
   useEffect(() => {
     if (isOpen && activeTab === 'scores' && userId && adminToken) {
@@ -216,7 +218,7 @@ export default function EditUserModal({
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-4 py-2 bg-[#ff7301] text-white rounded-md hover:bg-[#ff7301]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {loading ? 'Updating...' : 'Update'}
                   </button>
@@ -226,6 +228,15 @@ export default function EditUserModal({
 
             {activeTab === 'scores' && (
               <div className="space-y-4">
+                <div className="flex justify-end mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddScoreModal(true)}
+                    className="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors"
+                  >
+                    Add Score
+                  </button>
+                </div>
                 {scoresLoading ? (
                   <p className="text-white/70">Loading scores...</p>
                 ) : scores.length === 0 ? (
@@ -273,6 +284,22 @@ export default function EditUserModal({
         onConfirm={handleDeleteScoreConfirm}
         onCancel={() => setScoreToDelete(null)}
         loading={scoresLoading}
+      />
+
+      {/* Add Score Modal */}
+      <AddScoreModal
+        isOpen={showAddScoreModal}
+        userId={userId}
+        userName={userName}
+        adminToken={adminToken}
+        onClose={() => setShowAddScoreModal(false)}
+        onScoreAdded={() => {
+          setShowAddScoreModal(false);
+          fetchScores(); // Refresh scores list
+          if (onScoreDeleted) {
+            onScoreDeleted();
+          }
+        }}
       />
     </>
   );

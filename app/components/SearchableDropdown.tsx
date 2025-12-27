@@ -132,12 +132,12 @@ export default function SearchableDropdown({
         // Trigger the action (e.g., show report modal) and pass the input value
         onNoMatchesAction(inputValue.trim());
         setShowDropdown(false);
-      } else {
-        // No valid match - clear but don't move focus
-        setInputValue('');
-        onChange('');
-        setShowDropdown(false);
-      }
+    } else {
+      // No valid match - clear but don't move focus
+      setInputValue('');
+      onChange('');
+      setShowDropdown(false);
+    }
     }
   }, [inputValue, filteredOptions, handleSelect, onChange, onNoMatchesAction]);
 
@@ -150,7 +150,7 @@ export default function SearchableDropdown({
         onNoMatchesAction(inputValue.trim());
         setShowDropdown(false);
       } else {
-        handleConfirmSelection();
+      handleConfirmSelection();
       }
     }
   };
@@ -345,7 +345,7 @@ export default function SearchableDropdown({
               {noMatchesMessage}
             </button>
           ) : (
-            <p className="text-white/70 text-sm">No matching options found</p>
+          <p className="text-white/70 text-sm">No matching options found</p>
           )}
         </div>
       )}

@@ -346,13 +346,14 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     ? processedTotalRepsData.findIndex(e => isUserEntry(e.user_name, e.wing))
     : -1;
   
-  // Pagination logic: user's entry appears at bottom when just after current page
+  // Pagination logic: user's entry appears at bottom when not in current page
   let paginatedTotalRepsData: TotalRepsEntry[];
   let isUserJustAfterPage = false;
-  
+
   if (userEntryIndex >= 0) {
     if (userEntryIndex >= startIndexTotalReps && userEntryIndex < endIndexTotalReps) {
       // User is in current page - include normally
+      // Rank 4 will be in its natural position and use CSS sticky positioning
       paginatedTotalRepsData = processedTotalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
     } else if (userEntryIndex === endIndexTotalReps) {
       // User is just after current page - show them at bottom as sticky
@@ -360,7 +361,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
       paginatedTotalRepsData = processedTotalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
       isUserJustAfterPage = true;
     } else {
-      // User is far from current page - don't include
+      // User is far from current page - don't include, show at bottom
       paginatedTotalRepsData = processedTotalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
     }
   } else {
@@ -715,12 +716,19 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     {paginatedTotalRepsData.map((entry, index) => {
                       const isUser = isUserEntry(entry.user_name, entry.wing);
                       const isPlaceholder = entry.total_reps === 0 && isUser && entry.user_id === user?.id;
+                      // On page 1, rank 4 should stick to bottom when viewing ranks 1-3, and be in natural position when viewing ranks 3-5
+                      const isRank4OnPage1 = isUser && entry.rank === 4 && currentPage === 1;
+                      const stickyClass = isUser 
+                        ? (isRank4OnPage1 
+                            ? 'sticky bottom-[79px]' 
+                            : (isUserInCurrentPage ? 'sticky top-[40px]' : 'sticky bottom-[79px]'))
+                        : '';
                       return (
                       <React.Fragment key={entry.user_id}>
                         <tr
                           className={`${
                             isUser 
-                              ? `bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] ${isUserInCurrentPage ? 'sticky top-[40px]' : 'sticky bottom-[79px]'} z-20` 
+                              ? `bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] ${stickyClass} z-20` 
                               : entry.achieved_goal 
                                 ? 'bg-green-900/30 border-b border-white/10' 
                                 : 'border-b border-white/10 hover:bg-white/5'
@@ -775,7 +783,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                         <tr
                           className={`${
                             isUser 
-                              ? `bg-gray-800 [&>td]:border-l [&>td]:border-r [&>td]:border-b [&>td]:border-[#ff7301] ${isUserInCurrentPage ? 'sticky top-[120px]' : 'sticky bottom-0'} z-20` 
+                              ? `bg-gray-800 [&>td]:border-l [&>td]:border-r [&>td]:border-b [&>td]:border-[#ff7301] ${isRank4OnPage1 ? 'sticky bottom-0' : (isUserInCurrentPage ? 'sticky top-[79px]' : 'sticky bottom-0')} z-20` 
                               : entry.achieved_goal 
                                 ? 'bg-green-900/30 border-b border-white/10' 
                                 : 'border-b border-white/10'
@@ -823,7 +831,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                       );
                     })}
                     {/* Always show user's entry at bottom if it exists and is not in current page */}
-                    {userTotalRepsEntry && !isUserInCurrentPage && (
+                    {userTotalRepsEntry && (!isUserInCurrentPage || isUserJustAfterPage) && userEntryIndex !== -1 && (
                       <>
                         <tr className="bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] sticky bottom-[79px] z-20">
                           <td className={`py-3 px-4 font-medium ${getRankColorClass(userTotalRepsEntry.rank || 0)}`}>
@@ -913,7 +921,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                 </table>
               </div>
               {/* Mobile: Always show user's entry at bottom if it exists and is not in current page */}
-              {userTotalRepsEntry && !isUserInCurrentPage && (
+              {userTotalRepsEntry && (!isUserInCurrentPage || isUserJustAfterPage) && userEntryIndex !== -1 && (
                 <div className="block sm:hidden sticky bottom-0 z-20 mt-3">
                   <div className="rounded-lg p-4 bg-gray-800 border border-[#ff7301]">
                     <div className="flex items-start justify-between mb-2">

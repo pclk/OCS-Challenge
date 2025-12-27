@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     const reports = await getReports(wing);
     
-    return NextResponse.json({
+  return NextResponse.json({
       reports: reports,
     });
   } catch (error: any) {

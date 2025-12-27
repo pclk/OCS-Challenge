@@ -32,16 +32,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Load auth state from localStorage on mount
   useEffect(() => {
     const loadAuthState = async () => {
-      const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
-      const storedUser = localStorage.getItem(AUTH_USER_KEY);
+    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+    const storedUser = localStorage.getItem(AUTH_USER_KEY);
 
-      if (storedToken && storedUser) {
-        try {
-          const userData = JSON.parse(storedUser);
-          setToken(storedToken);
-          setUser(userData);
-          
-          // Verify token with server
+    if (storedToken && storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        setToken(storedToken);
+        setUser(userData);
+        
+        // Verify token with server
           try {
             const response = await fetch('/api/auth/verify', {
               headers: {
@@ -89,11 +89,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setToken(null);
             setUser(null);
           }
-          setLoading(false);
-        }
-      } else {
         setLoading(false);
       }
+    } else {
+      setLoading(false);
+    }
     };
 
     loadAuthState();

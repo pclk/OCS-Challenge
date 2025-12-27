@@ -466,33 +466,33 @@ export default function AuthForm() {
 
           {isLogin && !userNeedsPassword && name.trim() && wing.trim() && (
             <>
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-white mb-1">
-                  Password
-                </label>
-                <input
-                  ref={passwordRef}
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      // Submit form
-                      const form = e.currentTarget.closest('form');
-                      if (form) {
-                        form.requestSubmit();
-                      }
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-white mb-1">
+                Password
+              </label>
+              <input
+                ref={passwordRef}
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    // Submit form
+                    const form = e.currentTarget.closest('form');
+                    if (form) {
+                      form.requestSubmit();
                     }
-                  }}
-                  className="w-full px-3 py-2 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white"
-                  placeholder="Enter your password"
-                  required
-                  minLength={4}
-                  disabled={isSubmitting}
-                />
-              </div>
+                  }
+                }}
+                className="w-full px-3 py-2 border border-white/20 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff7301] focus:border-[#ff7301] bg-black text-white"
+                placeholder="Enter your password"
+                required
+                minLength={4}
+                disabled={isSubmitting}
+              />
+            </div>
               <div>
                 <label className="block text-sm font-medium text-white mb-2">
                   Remember Me
