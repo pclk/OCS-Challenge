@@ -340,7 +340,37 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   const totalPagesTotalReps = Math.ceil(processedTotalRepsData.length / itemsPerPageTotal);
   const startIndexTotalReps = (currentPage - 1) * itemsPerPageTotal;
   const endIndexTotalReps = startIndexTotalReps + itemsPerPageTotal;
-  const paginatedTotalRepsData = processedTotalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
+  
+  // Find user's entry index in the sorted data
+  const userEntryIndex = userTotalRepsEntry 
+    ? processedTotalRepsData.findIndex(e => isUserEntry(e.user_name, e.wing))
+    : -1;
+  
+  // Include user's entry if it's just outside the current page (within next item)
+  // Also include the entry after the user so they maintain their natural position
+  let paginatedTotalRepsData: TotalRepsEntry[];
+  let isUserJustAfterPage = false;
+  
+  if (userEntryIndex >= 0) {
+    if (userEntryIndex >= startIndexTotalReps && userEntryIndex < endIndexTotalReps) {
+      // User is in current page - include normally
+      paginatedTotalRepsData = processedTotalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
+    } else if (userEntryIndex === endIndexTotalReps) {
+      // User is just after current page - include them and the next entry (if exists)
+      // This ensures rank 4 appears after 3 and before 5, maintaining natural position
+      const nextEntryIndex = endIndexTotalReps + 1;
+      paginatedTotalRepsData = processedTotalRepsData.slice(
+        startIndexTotalReps, 
+        nextEntryIndex < processedTotalRepsData.length ? nextEntryIndex + 1 : nextEntryIndex
+      );
+      isUserJustAfterPage = true;
+    } else {
+      // User is far from current page - don't include
+      paginatedTotalRepsData = processedTotalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
+    }
+  } else {
+    paginatedTotalRepsData = processedTotalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
+  }
   
   // Check if user's entry is in the current page
   const isUserInCurrentPage = userTotalRepsEntry && paginatedTotalRepsData.some(e => isUserEntry(e.user_name, e.wing));
@@ -587,7 +617,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     key={entry.user_id}
                     className={`rounded-lg p-4 ${
                       isUser 
-                        ? `bg-gray-800 border border-[#ff7301] ${isUserInCurrentPage ? 'sticky top-0' : 'sticky bottom-0'} z-20` 
+                        ? `bg-gray-800 border border-[#ff7301] ${isUserJustAfterPage ? 'sticky top-0' : isUserInCurrentPage ? 'sticky top-0' : 'sticky bottom-0'} z-20` 
                         : entry.achieved_goal 
                           ? 'bg-green-900/30 border border-green-600/50' 
                           : 'border border-white/20 bg-black'
@@ -695,7 +725,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                         <tr
                           className={`${
                             isUser 
-                              ? `bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] ${isUserInCurrentPage ? 'sticky top-[40px]' : 'sticky bottom-[79px]'} z-20` 
+                              ? `bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] ${isUserJustAfterPage ? 'sticky top-[40px]' : isUserInCurrentPage ? 'sticky top-[40px]' : 'sticky bottom-[79px]'} z-20` 
                               : entry.achieved_goal 
                                 ? 'bg-green-900/30 border-b border-white/10' 
                                 : 'border-b border-white/10 hover:bg-white/5'
@@ -750,7 +780,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                         <tr
                           className={`${
                             isUser 
-                              ? `bg-gray-800 [&>td]:border-l [&>td]:border-r [&>td]:border-b [&>td]:border-[#ff7301] ${isUserInCurrentPage ? '' : 'sticky bottom-0'} z-20` 
+                              ? `bg-gray-800 [&>td]:border-l [&>td]:border-r [&>td]:border-b [&>td]:border-[#ff7301] ${isUserJustAfterPage || isUserInCurrentPage ? '' : 'sticky bottom-0'} z-20` 
                               : entry.achieved_goal 
                                 ? 'bg-green-900/30 border-b border-white/10' 
                                 : 'border-b border-white/10'
@@ -797,8 +827,8 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                       </React.Fragment>
                       );
                     })}
-                    {/* Always show user's entry at bottom if it exists and is not in current page */}
-                    {userTotalRepsEntry && !isUserInCurrentPage && (
+                    {/* Always show user's entry at bottom if it exists and is not in current page or just after */}
+                    {userTotalRepsEntry && !isUserInCurrentPage && !isUserJustAfterPage && (
                       <>
                         <tr className="bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] sticky bottom-[79px] z-20">
                           <td className={`py-3 px-4 font-medium ${getRankColorClass(userTotalRepsEntry.rank || 0)}`}>
@@ -887,8 +917,8 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                   </tbody>
                 </table>
               </div>
-              {/* Mobile: Always show user's entry at bottom if it exists and is not in current page */}
-              {userTotalRepsEntry && !isUserInCurrentPage && (
+              {/* Mobile: Always show user's entry at bottom if it exists and is not in current page or just after */}
+              {userTotalRepsEntry && !isUserInCurrentPage && !isUserJustAfterPage && (
                 <div className="block sm:hidden sticky bottom-0 z-20 mt-3">
                   <div className="rounded-lg p-4 bg-gray-800 border border-[#ff7301]">
                     <div className="flex items-start justify-between mb-2">

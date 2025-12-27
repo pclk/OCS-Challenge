@@ -98,14 +98,12 @@
   - Name: `JEFF SU`
   - Password: weiheng
 - Click **Login** or press Enter
-- Verify login succeeds and user is logged in
 
 ---
 
 ### Reports Feature - Account Conflict
 
 **14. Simulate Account Conflict**
-- **First, ensure account exists with password "weiheng"** (this should already exist from initial registration)
 - Go to **register page**
 - Try to register:
   - Wing: `DIS WING`
@@ -116,9 +114,7 @@
 
 **15. Admin Review - Account Conflict**
 - Go to **admin view**
-- Verify report type shows `ACCOUNT_CONFLICT`
 - Click **"Approve Account"** button (quick fix)
-- Note: This updates the password to "lmao" and logs out users with old tokens
 
 **15a. Verify Password Change**
 - Go to **login page**
@@ -126,12 +122,10 @@
   - Wing: `DIS WING`
   - Name: `SIEW WEI HENG`
   - Password: `weiheng` (old password)
-- Verify login **fails** (password no longer works)
 - Try to login with:
   - Wing: `DIS WING`
   - Name: `SIEW WEI HENG`
   - Password: `lmao` (new password from report)
-- Verify login **succeeds** (password was successfully updated)
 
 ---
 
@@ -148,7 +142,6 @@
 
 **18. Verify Exercise in User View**
 - Go to **user view** and login
-- Verify "Jumping Jacks" exercise appears at the bottom
 
 
 ### Keys
