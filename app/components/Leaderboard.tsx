@@ -221,7 +221,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     return filteredData;
   }, [exerciseBasedData]);
 
-  // Process Total Reps data: add placeholder if user has no entry, then filter by search
+  // Process Total Reps data: add placeholder if user has no entry, then filter by search, then sort by rank
   const processedTotalRepsData = useMemo(() => {
     let data = totalRepsData;
     
@@ -254,6 +254,9 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
         (entry.wing && entry.wing.toLowerCase().includes(searchLower))
       );
     }
+    
+    // Sort by rank (ascending)
+    data = [...data].sort((a, b) => (a.rank || 0) - (b.rank || 0));
     
     return data;
   }, [totalRepsData, user, isUserEntry, totalRepsSearch]);
@@ -333,12 +336,14 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
   const paginatedExerciseData = exerciseDataWithoutUser.slice(startIndexExercise, endIndexExercise);
 
   // Pagination helpers for Total Reps View
-  const totalRepsDataWithoutUser = filterOutUserTotalReps(processedTotalRepsData);
   const userTotalRepsEntry = findUserTotalRepsEntry(processedTotalRepsData);
-  const totalPagesTotalReps = Math.ceil(totalRepsDataWithoutUser.length / itemsPerPageTotal);
+  const totalPagesTotalReps = Math.ceil(processedTotalRepsData.length / itemsPerPageTotal);
   const startIndexTotalReps = (currentPage - 1) * itemsPerPageTotal;
   const endIndexTotalReps = startIndexTotalReps + itemsPerPageTotal;
-  const paginatedTotalRepsData = totalRepsDataWithoutUser.slice(startIndexTotalReps, endIndexTotalReps);
+  const paginatedTotalRepsData = processedTotalRepsData.slice(startIndexTotalReps, endIndexTotalReps);
+  
+  // Check if user's entry is in the current page
+  const isUserInCurrentPage = userTotalRepsEntry && paginatedTotalRepsData.some(e => isUserEntry(e.user_name, e.wing));
 
   // Export to CSV functions for different tabs
   const exportTotalRepsToCSV = () => {
@@ -582,7 +587,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     key={entry.user_id}
                     className={`rounded-lg p-4 ${
                       isUser 
-                        ? 'bg-gray-800 border border-[#ff7301] sticky bottom-0 z-20' 
+                        ? `bg-gray-800 border border-[#ff7301] ${isUserInCurrentPage ? 'sticky top-0' : 'sticky bottom-0'} z-20` 
                         : entry.achieved_goal 
                           ? 'bg-green-900/30 border border-green-600/50' 
                           : 'border border-white/20 bg-black'
@@ -685,13 +690,12 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     {paginatedTotalRepsData.map((entry, index) => {
                       const isUser = isUserEntry(entry.user_name, entry.wing);
                       const isPlaceholder = entry.total_reps === 0 && isUser && entry.user_id === user?.id;
-                      const isPreviousEntryUser = index > 0 && isUserEntry(paginatedTotalRepsData[index - 1].user_name, paginatedTotalRepsData[index - 1].wing);
                       return (
                       <React.Fragment key={entry.user_id}>
                         <tr
                           className={`${
                             isUser 
-                              ? 'bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] sticky bottom-[80px] z-20' 
+                              ? `bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] ${isUserInCurrentPage ? 'sticky top-[40px]' : 'sticky bottom-[79px]'} z-20` 
                               : entry.achieved_goal 
                                 ? 'bg-green-900/30 border-b border-white/10' 
                                 : 'border-b border-white/10 hover:bg-white/5'
@@ -746,7 +750,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                         <tr
                           className={`${
                             isUser 
-                              ? 'bg-gray-800 [&>td]:border-l [&>td]:border-r [&>td]:border-b [&>td]:border-[#ff7301] sticky bottom-0 z-20' 
+                              ? `bg-gray-800 [&>td]:border-l [&>td]:border-r [&>td]:border-b [&>td]:border-[#ff7301] ${isUserInCurrentPage ? '' : 'sticky bottom-0'} z-20` 
                               : entry.achieved_goal 
                                 ? 'bg-green-900/30 border-b border-white/10' 
                                 : 'border-b border-white/10'
@@ -794,7 +798,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                       );
                     })}
                     {/* Always show user's entry at bottom if it exists and is not in current page */}
-                    {userTotalRepsEntry && !paginatedTotalRepsData.some(e => isUserEntry(e.user_name, e.wing)) && (
+                    {userTotalRepsEntry && !isUserInCurrentPage && (
                       <>
                         <tr className="bg-gray-800 [&>td:first-child]:border-t [&>td:first-child]:border-l [&>td:first-child]:border-[#ff7301] [&>td]:border-t [&>td]:border-[#ff7301] [&>td:last-child]:border-r [&>td:last-child]:border-[#ff7301] sticky bottom-[79px] z-20">
                           <td className={`py-3 px-4 font-medium ${getRankColorClass(userTotalRepsEntry.rank || 0)}`}>
@@ -884,7 +888,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                 </table>
               </div>
               {/* Mobile: Always show user's entry at bottom if it exists and is not in current page */}
-              {userTotalRepsEntry && !paginatedTotalRepsData.some(e => isUserEntry(e.user_name, e.wing)) && (
+              {userTotalRepsEntry && !isUserInCurrentPage && (
                 <div className="block sm:hidden sticky bottom-0 z-20 mt-3">
                   <div className="rounded-lg p-4 bg-gray-800 border border-[#ff7301]">
                     <div className="flex items-start justify-between mb-2">
@@ -968,8 +972,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
           {processedTotalRepsData.length > 0 && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mt-4 pt-4 border-t border-white/20">
               <div className="text-white/70 text-sm">
-                Showing {startIndexTotalReps + 1} to {Math.min(endIndexTotalReps, totalRepsDataWithoutUser.length)} of {totalRepsDataWithoutUser.length} entries
-                {userTotalRepsEntry && <span className="text-white/50"> (+ your entry)</span>}
+                Showing {startIndexTotalReps + 1} to {Math.min(endIndexTotalReps, processedTotalRepsData.length)} of {processedTotalRepsData.length} entries
               </div>
               {totalPagesTotalReps > 1 && (
                 <div className="flex items-center gap-2">

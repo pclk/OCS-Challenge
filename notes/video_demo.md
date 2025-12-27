@@ -26,13 +26,10 @@
 
 **4. Leaderboard Features**
 - Click on a **user name** (in leaderboard)
-- View user score timeline
 - Close the modal
 
 **4a. Export Leaderboard Data**
 - Click the **Export button** (download icon) in the leaderboard header
-- Verify CSV file downloads with appropriate filename based on current tab:
-  - Total Reps tab: `total-reps-leaderboard-YYYY-MM-DD.csv`
 
 **5. Mobile Responsiveness**
 - Open **inspect element** and set mobile view
@@ -60,7 +57,6 @@
 - **Files > Download > .csv**
 - Return to webapp
 - **Upload** the CSV file
-- Verify users table is updated
 
 **8. Manual User Creation and Deletion**
 - Click **"Create User"** button
@@ -69,16 +65,12 @@
   - Name: `test`
   - Password: `test123`
 - Click **"Create"** or **"Submit"** button
-- Verify user appears in the users table
 - Click **"Delete"** button on the "test" user
 - Click **"Ban Account"** button
-- Verify user is removed from the table
 
 **9. Score Management (via Edit User)**
 - Click **"Edit"** button on "Bryan" in the Users table
 - Click **"Score Management"** tab in the Edit User modal
-- View scores for that user
-- (Optional) Click **"Delete"** on a score to test deletion
 - Close the modal
 
 ---
@@ -89,15 +81,8 @@
 - Go to **user registration** page
 - Select Wing: `DIS WING`
 - Try to register: Name: `JEFF SU` (not in system)
-- Verify field is blocked
 
 **12. Submit New Account Report**
-- Click **"Report"** button
-- Fill out report form:
-  - Wing: DIS WING
-  - Name: `JEFF SU`
-  - Password: weiheng
-  - (Optional) Fill in email, phone, notes
 - **Submit report**
 
 **13. Admin Review - New Account**

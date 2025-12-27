@@ -128,3 +128,5 @@ This document lists all data currently stored outside the database that should b
 1. **Reports** - Critical: Data loss on restart
 2. **Admin Passwords** - Important: Better security and management
 
+
+
