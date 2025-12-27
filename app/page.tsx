@@ -15,7 +15,11 @@ interface Exercise {
   type: string;
 }
 
-export default function Home() {
+export default function Home({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+} = {}) {
   const { user, loading, logout, token } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [exercises, setExercises] = useState<Exercise[]>([]);
