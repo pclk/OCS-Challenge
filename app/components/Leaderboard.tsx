@@ -608,12 +608,19 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                 {paginatedTotalRepsData.map((entry) => {
                   const isUser = isUserEntry(entry.user_name, entry.wing);
                   const isPlaceholder = entry.total_reps === 0 && isUser && entry.user_id === user?.id;
+                  // On page 1, rank 4 should stick to bottom when viewing ranks 1-3, and be in natural position when viewing ranks 3-5
+                  const isRank4OnPage1 = isUser && entry.rank === 4 && currentPage === 1;
+                  const stickyClass = isUser 
+                    ? (isRank4OnPage1 
+                        ? 'sticky bottom-0' 
+                        : (isUserInCurrentPage ? 'sticky top-0' : 'sticky bottom-0'))
+                    : '';
                   return (
                   <div
                     key={entry.user_id}
                     className={`rounded-lg p-4 ${
                       isUser 
-                        ? `bg-gray-800 border border-[#ff7301] ${isUserInCurrentPage ? 'sticky top-0' : 'sticky bottom-0'} z-20` 
+                        ? `bg-gray-800 border border-[#ff7301] ${stickyClass} z-20` 
                         : entry.achieved_goal 
                           ? 'bg-green-900/30 border border-green-600/50' 
                           : 'border border-white/20 bg-black'
