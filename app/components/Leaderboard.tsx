@@ -22,10 +22,6 @@ interface WingLeaderboardEntry {
   personnel_count: number;
 }
 
-
-
-
-
 interface ExerciseBasedEntry {
   exercise_id: number;
   exercise_name: string;
@@ -1089,9 +1085,10 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
             </div>
           )}
         </>
-      ) : activeTab === 'wing' ? (
+        ) : activeTab === 'wing' ? (
         <>
           <h2 className="text-2xl font-bold text-white mb-4">Wing Leaderboard</h2>
+      
           {wingLeaderboard.length === 0 ? (
             <p className="text-white/70">No wing scores yet.</p>
           ) : (
@@ -1107,7 +1104,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedWingData.map((entry, idx) => (
+                    {wingLeaderboard.map((entry, idx) => (
                       <tr key={idx} className="border-b border-white/10 hover:bg-white/5">
                         <td className="py-3 px-4 text-white">{entry.wing}</td>
                         <td className="py-3 px-4 text-[#ff7301] font-semibold">{entry.score}</td>
@@ -1117,9 +1114,10 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                   </tbody>
                 </table>
               </div>
+      
               {/* Mobile card view */}
               <div className="sm:hidden space-y-3">
-                {paginatedWingData.map((entry, idx) => (
+                {wingLeaderboard.map((entry, idx) => (
                   <div
                     key={idx}
                     className="rounded-lg p-4 bg-gray-800 border border-white/10 hover:border-[#ff7301] transition-colors"
@@ -1131,7 +1129,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                     <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-[#ff7301]"
-                        style={{ width: `${(entry.score / maxWingScore) * 100}%` }}
+                        style={{ width: `${(entry.score / Math.max(...wingLeaderboard.map(e => e.score), 1)) * 100}%` }}
                       />
                     </div>
                     <div className="flex items-center justify-between text-white/70 text-xs mt-2">
@@ -1140,33 +1138,6 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
                   </div>
                 ))}
               </div>
-              {/* Pagination */}
-              {totalPagesWing > 1 && (
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mt-4 pt-4 border-t border-white/20">
-                  <div className="text-white/70 text-sm">
-                    Showing {startIndexWing + 1} to {Math.min(endIndexWing, wingLeaderboard.length)} of {wingLeaderboard.length} entries
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCurrentWingPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentWingPage === 1}
-                      className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
-                    >
-                      Previous
-                    </button>
-                    <span className="text-white/70 text-sm">
-                      Page {currentWingPage} of {totalPagesWing}
-                    </span>
-                    <button
-                      onClick={() => setCurrentWingPage(prev => Math.min(totalPagesWing, prev + 1))}
-                      disabled={currentWingPage === totalPagesWing}
-                      className="px-3 py-1 rounded-md bg-[#ff7301] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#ff7301]/90 transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
             </>
           )}
         </>
