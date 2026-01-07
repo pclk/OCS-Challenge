@@ -16,12 +16,6 @@ interface LeaderboardEntry {
   user_id: number;
 }
 
-interface WingLeaderboardEntry {
-  wing: string;
-  score: number;
-  personnel_count: number;
-}
-
 interface ExerciseBasedEntry {
   exercise_id: number;
   exercise_name: string;
@@ -60,9 +54,8 @@ interface LeaderboardProps {
 
 export default function Leaderboard({ exercises, wings: allWings }: LeaderboardProps) {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'exercise' | 'all' | 'total' | 'wing'>('total');
+  const [activeTab, setActiveTab] = useState<'exercise' | 'all' | 'total'>('total');
   const [wing, setWing] = useState('OCS LEVEL');
-  const [wingLeaderboard, setWingLeaderboard] = useState<WingLeaderboardEntry[]>([]);
   const [exerciseBasedData, setExerciseBasedData] = useState<ExerciseBasedEntry[]>([]);
   const [allData, setAllData] = useState<Record<string, LeaderboardEntry[]>>({});
   const [totalRepsData, setTotalRepsData] = useState<TotalRepsEntry[]>([]);
@@ -155,14 +148,6 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
           const errorData = await response.json().catch(() => ({ error: 'Failed to fetch leaderboard' }));
           toast.dismiss(loadingToast);
           toast.error(errorData.error || 'Failed to fetch leaderboard');
-        }
-      } else if (activeTab === 'wing') {
-        const response = await fetch('/api/wing-leaderboard');
-        if (response.ok) {
-          const data = await response.json();
-          setWingLeaderboard(data);
-        } else {
-          setWingLeaderboard([]);
         }
       } else {
         // Use exercises prop instead of fetching again
@@ -428,7 +413,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     document.body.removeChild(link);
     toast.success('CSV exported successfully!');
   };
-  
+
   const exportExerciseBasedToCSV = () => {
     const headers = ['Exercise', 'Name', 'Wing', 'Reps', 'Date'];
     const rows = processedExerciseBasedData.map(entry => [
@@ -490,33 +475,11 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
     toast.success('CSV exported successfully!');
   };
 
-  const exportWingLeaderboardToCSV = () => {
-  if (!wingLeaderboard.length) return;
-  const headers = ['Wing', 'Score', 'Personnel Count'];
-  const rows = wingLeaderboard.map(entry => [
-    entry.wing,
-    entry.score,
-    entry.personnel_count,
-  ]);
-  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', `wing-leaderboard-${new Date().toISOString().split('T')[0]}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  toast.success('CSV exported successfully!');
-  };
-
   const handleExport = () => {
     if (activeTab === 'total') {
       exportTotalRepsToCSV();
     } else if (activeTab === 'exercise') {
       exportExerciseBasedToCSV();
-    } else if (activeTab === 'wing') {
-      exportWingLeaderboardToCSV();
     } else {
       exportAllScoresToCSV();
     }
@@ -569,16 +532,6 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
               }`}
             >
               OCS 60 PT Challenge
-            </button>
-            <button
-              onClick={() => setActiveTab('wing')}
-              className={`px-4 sm:px-6 py-3 font-semibold transition-colors whitespace-nowrap ${
-                activeTab === 'wing'
-                  ? 'text-[#ff7301] border-b-2 border-[#ff7301]'
-                  : 'text-white/70 hover:text-white'
-              }`}
-            >
-              Wing Leaderboard
             </button>
             <button
               onClick={() => setActiveTab('all')}
@@ -1085,62 +1038,6 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
             </div>
           )}
         </>
-        ) : activeTab === 'wing' ? (
-        <>
-          <h2 className="text-2xl font-bold text-white mb-4">Wing Leaderboard</h2>
-      
-          {wingLeaderboard.length === 0 ? (
-            <p className="text-white/70">No wing scores yet.</p>
-          ) : (
-            <>
-              {/* Desktop table */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full border-separate border-spacing-0">
-                  <thead className="sticky top-0 bg-black z-10">
-                    <tr className="border-b border-white/20">
-                      <th className="text-left py-2 px-4 font-semibold text-white">Wing</th>
-                      <th className="text-left py-2 px-4 font-semibold text-white">Score</th>
-                      <th className="text-left py-2 px-4 font-semibold text-white">Personnel Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {wingLeaderboard.map((entry, idx) => (
-                      <tr key={idx} className="border-b border-white/10 hover:bg-white/5">
-                        <td className="py-3 px-4 text-white">{entry.wing}</td>
-                        <td className="py-3 px-4 text-[#ff7301] font-semibold">{entry.score}</td>
-                        <td className="py-3 px-4 text-white/80">{entry.personnel_count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-      
-              {/* Mobile card view */}
-              <div className="sm:hidden space-y-3">
-                {wingLeaderboard.map((entry, idx) => (
-                  <div
-                    key={idx}
-                    className="rounded-lg p-4 bg-gray-800 border border-white/10 hover:border-[#ff7301] transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-white font-medium">{entry.wing}</span>
-                      <span className="text-[#ff7301] font-semibold">{entry.score}</span>
-                    </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#ff7301]"
-                        style={{ width: `${(entry.score / Math.max(...wingLeaderboard.map(e => e.score), 1)) * 100}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-white/70 text-xs mt-2">
-                      <span>Personnel: {entry.personnel_count}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </>
       ) : activeTab === 'exercise' ? (
         <>
           {exerciseBasedData.length === 0 ? (
@@ -1544,7 +1441,7 @@ export default function Leaderboard({ exercises, wings: allWings }: LeaderboardP
             })
           )}
         </div>
-      )}                                          
+      )}
 
       {/* User Score Timeline Modal */}
       {timelineModal && (
