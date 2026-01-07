@@ -1630,51 +1630,6 @@ export async function createScores(scores: Array<{ userId: number; exerciseId: n
   }
 }
 
-export async function getWingLeaderboard(limit: number = 3) {
-  await ensureInitialized();
-
-  const userTotals = await prisma.score.groupBy({
-    by: ['userId'],
-    _sum: { value: true },
-  });
-
-  const withWing = await Promise.all(
-    userTotals.map(async (ut) => {
-      const user = await prisma.user.findUnique({
-        where: { id: ut.userId },
-        select: { wing: true },
-      });
-      if (user?.wing) {
-        return {
-          wing: user.wing,
-          score: ut._sum.value || 0,
-        };
-      }
-      return null;
-    })
-  );
-
-  const wingMap: Record<string, { score: number; personnel_count: number }> = {};
-  for (const entry of withWing.filter(Boolean) as { wing: string; score: number }[]) {
-    if (!wingMap[entry.wing]) {
-      wingMap[entry.wing] = { score: 0, personnel_count: 0 };
-    }
-    wingMap[entry.wing].score += entry.score;
-    wingMap[entry.wing].personnel_count += 1;
-  }
-
-  const rows = Object.entries(wingMap)
-    .map(([wing, data]) => ({
-      wing,
-      score: data.score,
-      personnel_count: data.personnel_count,
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
-
-  return rows;
-}
-
 // Get leaderboard for a specific exercise (top N, sorted by highest rep, optionally filtered by wing)
 export async function getLeaderboard(exerciseId: number, limit: number = 10, wing?: string | null) {
   await ensureInitialized();
