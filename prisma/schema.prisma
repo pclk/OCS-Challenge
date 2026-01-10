@@ -59,6 +59,7 @@ model Score {
 
   @@index([exerciseId, value(sort: Desc)])
   @@index([userId])
+  @@unique([userId, exerciseId])
   @@map("scores")
 }
 
