@@ -1484,12 +1484,10 @@ export async function deleteExercise(id: number) {
 // Create a score
 export async function createScore(userId: number, exerciseId: number, value: number) {
   await ensureInitialized();
-  await prisma.score.create({
-    data: {
-      userId,
-      exerciseId,
-      value,
-    },
+  return prisma.score.upsert({
+      where: { userId_exercise: { userId, exerciseId } },
+      update: { value: { increment: value } },
+      create: { userId, exerciseId, value },
   });
 }
 
