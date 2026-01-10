@@ -1485,7 +1485,7 @@ export async function deleteExercise(id: number) {
 export async function createScore(userId: number, exerciseId: number, value: number) {
   await ensureInitialized();
   return prisma.score.upsert({
-      where: { userId_exercise: { userId, exerciseId } },
+      where: { userId_exerciseId: { userId, exerciseId } },
       update: { value: { increment: value } },
       create: { userId, exerciseId, value },
   });
