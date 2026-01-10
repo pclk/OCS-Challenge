@@ -1483,11 +1483,10 @@ export async function deleteExercise(id: number) {
 
 // Create a score
 export async function createScore(userId: number, exerciseId: number, value: number) {
-  await ensureInitialized();
   return prisma.score.upsert({
-      where: { userId_exerciseId: { userId, exerciseId } },
-      update: { value: { increment: value } },
-      create: { userId, exerciseId, value },
+    where: { userId_exerciseId: { userId, exerciseId } },
+    update: { value: { increment: value } },
+    create: { userId, exerciseId, value },
   });
 }
 
@@ -1585,36 +1584,35 @@ export async function createScores(scores: Array<{ userId: number; exerciseId: n
     count: scores.length,
     scores: scores.slice(0, 3) // Log first 3 for debugging
   });
-  
+
   await ensureInitialized();
-  
+
   if (scores.length === 0) {
     console.log('[DB] createScores - No scores to create, returning early');
     return;
   }
-  
+
   try {
-    const dataToInsert = scores.map(score => ({
-      userId: score.userId,
-      exerciseId: score.exerciseId,
-      value: score.value,
-    }));
-    
-    console.log('[DB] createScores - About to execute createMany:', {
-      dataCount: dataToInsert.length,
-      firstRecord: dataToInsert[0],
-      skipDuplicates: true
-    });
-    
-    // Use createMany for bulk insert - more efficient and avoids transaction issues with adapter
-    const result = await prisma.score.createMany({
-      data: dataToInsert,
-      skipDuplicates: true, // Skip if duplicate score exists
-    });
-    
-    console.log('[DB] createScores - createMany executed successfully:', {
-      count: result.count
-    });
+    for (const score of scores) {
+      await prisma.score.upsert({
+        where: {
+          userId_exerciseId: {
+            userId: score.userId,
+            exerciseId: score.exerciseId,
+          },
+        },
+        update: {
+          value: { increment: score.value }, // ✅ increment existing score
+        },
+        create: {
+          userId: score.userId,
+          exerciseId: score.exerciseId,
+          value: score.value,
+        },
+      });
+    }
+
+    console.log('[DB] createScores - upsert executed successfully for', scores.length, 'records');
   } catch (error: any) {
     console.error('[DB] createScores - Error occurred:', {
       error: error?.message,
