@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 2);
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
     if (new Date(user.created_at) < sixMonthsAgo) {
       return NextResponse.json(
