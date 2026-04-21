@@ -125,9 +125,9 @@ export async function POST(request: NextRequest) {
     }
 
     const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 2);
 
-    if (new Date(user.created_at) < sixMonthsAgo || user.name === "BRYAN OW") {
+    if (new Date(user.created_at) < sixMonthsAgo) {
       return NextResponse.json(
         { error: 'You cannot add reps — your account is older than 6 months.' },
         { status: 403 }
