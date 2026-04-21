@@ -564,8 +564,9 @@ export async function getUserById(id: number) {
     name: string;
     wing: string | null;
     password_changed_at: Date | null;
+    created_at: Date;
   }>>`
-    SELECT id, name, wing, password_changed_at
+    SELECT id, name, wing, password_changed_at, created_at
     FROM users
     WHERE id = ${id}
     LIMIT 1
@@ -581,6 +582,7 @@ export async function getUserById(id: number) {
     name: user.name,
     wing: user.wing,
     passwordChangedAt: user.password_changed_at,
+    created_at: user.created_at,
   };
 }
 

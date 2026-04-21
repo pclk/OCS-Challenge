@@ -124,6 +124,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    if (new Date(user.created_at) < sixMonthsAgo || user.name === "BRYAN OW") {
+      return NextResponse.json(
+        { error: 'You cannot add reps — your account is older than 6 months.' },
+        { status: 403 }
+      );
+    }
+
     // Validate and create scores
     const validScores = scores
       .filter((s: any) => {
